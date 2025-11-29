@@ -76,6 +76,7 @@ export default function Select({
                 onClick={(e) => {
                   e.stopPropagation();
                   onChange(opt.value);
+                  setOpen(false);
                 }}
               >
                 {opt.label}

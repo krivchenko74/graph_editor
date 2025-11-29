@@ -1,3 +1,4 @@
+// StepManager.tsx - с нормализованными скоростями
 "use client";
 import styles from "./StepManager.module.css";
 import {
@@ -11,8 +12,17 @@ import {
 } from "react-icons/bs";
 import { useVisualization } from "@/hooks/useVisualization";
 
+// Функция для форматирования скорости в понятный вид
+const formatSpeed = (ms: number) => {
+  if (ms >= 1000) {
+    return `${ms / 1000}s`; // показываем в секундах
+  } else {
+    return `${ms}ms`; // показываем в миллисекундах
+  }
+};
+
 export default function StepManager() {
-  const speeds = [0.2, 0.5, 1, 1.5, 2, 5, 10, 50, 100, 500, 5000];
+  const speeds = [5000, 2000, 1000, 667, 500, 200, 100, 20, 10, 2, 0.2];
 
   const {
     isRunning,
@@ -27,7 +37,6 @@ export default function StepManager() {
     handleSpeedChange,
     setStep,
     resetVisualization,
-    currentAlgorithm,
   } = useVisualization();
 
   const handleFirstStep = () => setStep(0);
@@ -44,7 +53,9 @@ export default function StepManager() {
       handleSpeedChange(speedIndex - 1);
     }
   };
-  const isShown = totalSteps != 0;
+
+  const isShown = true;
+
   return (
     isShown && (
       <div className={styles.container}>
@@ -113,7 +124,7 @@ export default function StepManager() {
           </button>
 
           <span className={styles.text} title="Скорость воспроизведения">
-            {speeds[speedIndex]}x
+            {formatSpeed(speeds[speedIndex])}
           </span>
 
           <button

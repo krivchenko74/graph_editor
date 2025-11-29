@@ -1,3 +1,4 @@
+// Header.tsx - исправленная версия
 "use client";
 import Select from "../Select/Select";
 import GraphActionsMenu from "../GraphActionsMenu/GraphActionsMenu";
@@ -10,7 +11,7 @@ import { Download, Upload, Trash2 } from "lucide-react";
 
 export default function Header() {
   const { clearGraph, graph } = useGraphStore();
-  const { startAlgorithm, currentAlgorithm, isRunning } = useVisualization();
+  const { prepareAlgorithm, currentAlgorithm } = useVisualization(); // Используем prepareAlgorithm
 
   const algorithms = getAvailableAlgorithms();
 
@@ -22,11 +23,10 @@ export default function Header() {
 
     // Для алгоритмов, требующих выбор начальной вершины
     if (algorithmType === "dfs") {
-      // Можно добавить модальное окно для выбора начальной вершины
-      // Пока используем первую вершину
       const startVertex = graph.vertices[0];
       if (startVertex) {
-        startAlgorithm(
+        prepareAlgorithm(
+          // Используем prepareAlgorithm вместо setAlgorithm
           algorithmType as any,
           startVertex.id,
           graph.vertices,
@@ -133,7 +133,7 @@ export default function Header() {
     <header className={styles.header}>
       <GraphActionsMenu actions={actions} label="Действия с графом" />
       <Select
-        placeholder="Выберите алгоритм"
+        placeholder="Алгоритмы"
         value={currentAlgorithm || ""}
         onChange={handleAlgorithmSelect}
         options={algorithms}

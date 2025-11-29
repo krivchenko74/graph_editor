@@ -1,8 +1,10 @@
+// visualization-store.tsx - версия с асинхронными обновлениями
 // stores/visualization-store.ts
 import { create } from "zustand";
 import { AlgorithmType, AlgorithmStep } from "@/types/algorithm";
 import { getAlgorithm } from "@/algorithms/index";
 import { TVertex, TEdge } from "@/types/graph";
+
 interface IVisualizationStore {
   // Состояние
   isRunning: boolean;
@@ -14,12 +16,13 @@ interface IVisualizationStore {
   speed: number;
 
   // Действия
-  startVisualization: (
+  prepareAlgorithm: (
     algorithm: AlgorithmType,
     startVertexId: string,
     vertices: TVertex[],
     edges: TEdge[]
   ) => void;
+  startVisualization: () => void;
   stopVisualization: () => void;
   pauseVisualization: () => void;
   nextStep: () => boolean;
@@ -39,7 +42,7 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
   currentAlgorithm: null,
   speed: 2,
 
-  startVisualization: (
+  prepareAlgorithm: (
     algorithm: AlgorithmType,
     startVertexId: string,
     vertices: TVertex[],
@@ -51,7 +54,6 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
       return;
     }
 
-    // Проверяем требования алгоритма
     if (algo.requirements) {
       if (algo.requirements.directed && !edges.some((e) => e.directed)) {
         alert(`Алгоритм ${algo.name} требует направленные ребра`);
@@ -64,15 +66,22 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
     }
 
     const steps = algo.start(startVertexId, vertices, edges);
-
+    console.log("steps: ", steps);
     set({
-      isRunning: true,
+      isRunning: false,
       step: 0,
       steps,
       currentStep: steps[0],
       startVertexId,
       currentAlgorithm: algorithm,
     });
+  },
+
+  startVisualization: () => {
+    const { steps } = get();
+    if (steps.length > 0) {
+      set({ isRunning: true });
+    }
   },
 
   stopVisualization: () => {
@@ -89,14 +98,18 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
   },
 
   nextStep: () => {
-    const { step, steps } = get();
+    const state = get();
+    const { step, steps } = state;
+
     if (step < steps.length - 1) {
       const newStep = step + 1;
+
+      // КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: объединяем обновления в один set
       set({
         step: newStep,
         currentStep: steps[newStep],
       });
-      console.log(steps[newStep]);
+
       return true;
     } else {
       set({ isRunning: false });
@@ -105,7 +118,9 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
   },
 
   prevStep: () => {
-    const { step, steps } = get();
+    const state = get();
+    const { step, steps } = state;
+
     if (step > 0) {
       const newStep = step - 1;
       set({

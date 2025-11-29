@@ -1,3 +1,4 @@
+// useVisualization.ts - исправленная версия
 // hooks/useVisualization.ts
 import { useCallback, useEffect, useRef } from "react";
 import useVisualizationStore from "@/stores/visualization-store";
@@ -14,6 +15,7 @@ export const useVisualization = () => {
     startVertexId,
     currentAlgorithm,
     speed,
+    prepareAlgorithm: storePrepareAlgorithm, // Переименовываем, чтобы избежать конфликта
     startVisualization,
     stopVisualization,
     pauseVisualization,
@@ -36,7 +38,7 @@ export const useVisualization = () => {
       return;
     }
 
-    const interval = speeds[speed]; // Теперь это интервал в миллисекундах
+    const interval = speeds[speed];
 
     const playNextStep = () => {
       const hasNext = nextStep();
@@ -54,16 +56,17 @@ export const useVisualization = () => {
     };
   }, [isRunning, speed, steps.length, nextStep, stopVisualization]);
 
-  const startAlgorithm = useCallback(
+  // Переименовываем функцию, чтобы избежать конфликта
+  const prepareAlgorithm = useCallback(
     (
       algorithm: AlgorithmType,
       startVertexId: string,
       vertices: any[],
       edges: any[]
     ) => {
-      startVisualization(algorithm, startVertexId, vertices, edges);
+      storePrepareAlgorithm(algorithm, startVertexId, vertices, edges);
     },
-    [startVisualization]
+    [storePrepareAlgorithm]
   );
 
   const handlePlayPause = useCallback(() => {
@@ -73,9 +76,16 @@ export const useVisualization = () => {
       if (step >= steps.length - 1) {
         setStep(0);
       }
-      useVisualizationStore.setState({ isRunning: true });
+      startVisualization();
     }
-  }, [isRunning, step, steps.length, pauseVisualization, setStep]);
+  }, [
+    isRunning,
+    step,
+    steps.length,
+    pauseVisualization,
+    setStep,
+    startVisualization,
+  ]);
 
   const handleSpeedChange = useCallback(
     (newSpeed: number) => {
@@ -105,7 +115,8 @@ export const useVisualization = () => {
     totalSteps,
 
     // Actions
-    startAlgorithm,
+    prepareAlgorithm, // Экспортируем под тем же именем
+    startVisualization,
     stopVisualization,
     pauseVisualization,
     nextStep,
