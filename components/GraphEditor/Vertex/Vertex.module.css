@@ -1,0 +1,44 @@
+.vertex {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 50%;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.vertex:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+}
+
+.text {
+  font-weight: 600;
+  font-size: 12px;
+  color: #1e293b;
+  text-align: center;
+  pointer-events: none;
+}
+
+.input {
+  display: flex;
+  width: 70%;
+  padding: 2px 0;
+  border: none;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  text-align: center;
+  font-weight: 600;
+  font-size: 12px;
+  max-width: 100%;
+  outline: 1px solid #3b82f6;
+}
+.selected {
+  border-color: red;
+}

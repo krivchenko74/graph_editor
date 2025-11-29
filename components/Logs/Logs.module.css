@@ -1,0 +1,306 @@
+/* components/AlgorithmLog/AlgorithmLog.module.css */
+.logContainer {
+  position: absolute;
+  top: 3vh;
+  right: 3vw;
+  width: fit-content;
+  max-width: 400px;
+  border-radius: 8px;
+  padding: 16px;
+  height: fit-content;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  /* From https://css.glass */
+  background: #f9f9f9;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+.logContainer.collapsed {
+  max-height: 60px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #dee2e6;
+  cursor: pointer;
+  transition: margin-bottom 0.3s ease-in-out;
+}
+
+.logContainer.collapsed .header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #212529;
+  transition: font-size 0.3s ease-in-out;
+}
+
+.logContainer.collapsed .title {
+  font-size: 1rem;
+}
+
+.stepCounter {
+  margin-top: 10px;
+  display: flex;
+  width: fit-content;
+  background: #3b82f6;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.logContainer.collapsed .stepCounter {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  transition: all 0.3s ease-in-out;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.logContainer.collapsed .content {
+  opacity: 0;
+  transform: translateY(-10px);
+  pointer-events: none;
+  height: 0;
+  flex: 0;
+}
+
+.currentStep {
+  background: white;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease-in-out;
+}
+
+.currentStepLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 4px;
+}
+
+.description {
+  font-size: 1rem;
+  color: #212529;
+  line-height: 1.4;
+}
+
+.history {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.historyLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 8px;
+}
+
+.stepsList {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  background: white;
+  padding: 8px;
+  overflow-x: scroll;
+  max-width: 100%;
+}
+
+.stepItem {
+  padding: 12px;
+  border-left: 3px solid #dee2e6;
+  margin-bottom: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.stepItem:hover {
+  background: #e9ecef;
+}
+
+.stepItem.currentStepItem {
+  border-left-color: #007bff;
+  background: #e7f3ff;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+}
+
+.stepNumber {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 4px;
+}
+
+.stepDescription {
+  font-size: 0.9rem;
+  color: #212529;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.stepDetails {
+  border-top: 1px dashed #dee2e6;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.detailItem {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+}
+
+.detailItem:last-child {
+  margin-bottom: 0;
+}
+
+.detailLabel {
+  font-weight: 600;
+  color: #6c757d;
+  margin-right: 8px;
+  min-width: 100px;
+}
+
+.stackValue,
+.vertexValue,
+.visitedValue {
+  font-family: "Consolas", "Monaco", monospace;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 0.75rem;
+}
+
+.statistics {
+  background: white;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 16px;
+}
+
+.statisticsLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 8px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.statLabel {
+  font-size: 0.75rem;
+  color: #6c757d;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.statValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #007bff;
+}
+
+.collapseIcon {
+  margin-left: 8px;
+  transition: transform 0.3s ease-in-out;
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.logContainer.collapsed .collapseIcon {
+  transform: rotate(-90deg);
+}
+
+/* Стили для скроллбара */
+.stepsList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.stepsList::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.stepsList::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.stepsList::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .logContainer {
+    height: 400px;
+    padding: 12px;
+    max-width: 350px;
+  }
+
+  .logContainer.collapsed {
+    max-height: 50px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .stepItem {
+    padding: 8px;
+  }
+}

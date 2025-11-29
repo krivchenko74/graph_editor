@@ -1,0 +1,70 @@
+.wrapper {
+  position: relative;
+}
+.trigger {
+  width: fit-content;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 30px;
+  padding: 0 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  color: #1a1a1a;
+  transition: box-shadow 0.2s ease;
+  user-select: none;
+}
+
+.trigger:hover {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #0f172a;
+}
+
+.arrow {
+  font-size: 11px;
+  color: #64748b;
+  transition: transform 0.25s ease;
+  margin-left: 8px;
+}
+
+.open .arrow {
+  transform: rotate(180deg);
+}
+
+/* Выпадающее меню — вылетает за хедер */
+.dropdown {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 30px;
+  padding: 10px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  z-index: 9999;
+}
+
+/* Опции */
+.option {
+  padding: 12px 18px;
+  cursor: pointer;
+  font-size: 14.5px;
+  color: #1e293b;
+  border-radius: 1000px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.option:hover {
+  background: #f1f1f1;
+}

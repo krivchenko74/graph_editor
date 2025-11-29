@@ -1,0 +1,16 @@
+.option {
+  display: flex;
+  align-items: center;
+  column-gap: 8px;
+}
+.optionIcon {
+  display: flex;
+}
+
+.danger {
+  color: #e74c3c;
+}
+
+.danger:hover {
+  background-color: rgba(231, 76, 60, 0.1);
+}

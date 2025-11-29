@@ -1,0 +1,7 @@
+.edgePath {
+  transition: stroke 0.2s;
+}
+
+.edgePath:hover {
+  stroke: #3b82f6;
+}

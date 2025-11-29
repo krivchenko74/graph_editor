@@ -1,0 +1,76 @@
+.container {
+  position: absolute;
+  bottom: 3vh;
+  display: flex;
+  column-gap: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  user-select: none;
+}
+.text {
+  font-weight: 500;
+  width: 30px;
+  text-align: center;
+}
+.autoplay_container,
+.step_container {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-radius: 1000px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(9.5px);
+  -webkit-backdrop-filter: blur(9.5px);
+  border: 1px solid rgba(255, 255, 255, 0.67);
+}
+.turn {
+  transform: rotate(180deg);
+}
+.button:disabled {
+  transition: none;
+  background-color: transparent !important;
+  cursor: unset;
+}
+.button:disabled:active {
+  scale: 1;
+}
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 35px;
+  height: 35px;
+  background-color: transparent;
+  border-radius: 1000px;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.button:hover {
+  background-color: #f1f1f1;
+}
+.button:active {
+  scale: 0.9;
+}
+.resetButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1000px;
+  padding: 12px;
+  cursor: pointer;
+  border: 2px solid #e74c3c;
+  background-color: rgba(231, 76, 60, 0.1);
+  transition: 0.2s;
+}
+.resetButton:hover {
+  background-color: rgba(231, 76, 60, 0.3);
+}
+.resetButton svg {
+  display: flex;
+  color: #e74c3c;
+}
+.resetButton:active {
+  scale: 0.9;
+}
