@@ -14,6 +14,7 @@ export default function Header() {
   const { prepareAlgorithm, currentAlgorithm } = useVisualization(); // Используем prepareAlgorithm
 
   const algorithms = getAvailableAlgorithms();
+  console.log(algorithms);
 
   const handleAlgorithmSelect = (algorithmType: string) => {
     if (graph.vertices.length === 0) {
@@ -33,10 +34,17 @@ export default function Header() {
           graph.edges
         );
       }
-    } else {
-      alert(
-        `Алгоритм "${algorithmType}" будет доступен в следующем обновлении, ${algorithmType}`
-      );
+    } else if (algorithmType === "bfs") {
+      const startVertex = graph.vertices[0];
+      if (startVertex) {
+        prepareAlgorithm(
+          // Используем prepareAlgorithm вместо setAlgorithm
+          algorithmType as any,
+          startVertex.id,
+          graph.vertices,
+          graph.edges
+        );
+      }
     }
   };
 

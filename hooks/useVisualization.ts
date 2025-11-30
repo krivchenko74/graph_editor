@@ -1,62 +1,117 @@
-// useVisualization.ts - исправленная версия
 // hooks/useVisualization.ts
+"use client";
+
 import { useCallback, useEffect, useRef } from "react";
 import useVisualizationStore from "@/stores/visualization-store";
 import { AlgorithmType } from "@/types/algorithm";
 
-const speeds = [0.2, 0.5, 1, 1.5, 2, 5, 10, 50, 100, 500, 5000];
+const speeds = [5000, 2000, 1000, 667, 500, 200, 100, 20, 10, 2, 0.2];
 
 export const useVisualization = () => {
-  const {
-    isRunning,
-    step,
-    steps,
-    currentStep,
-    startVertexId,
-    currentAlgorithm,
-    speed,
-    prepareAlgorithm: storePrepareAlgorithm, // Переименовываем, чтобы избежать конфликта
-    startVisualization,
-    stopVisualization,
-    pauseVisualization,
-    nextStep,
-    prevStep,
-    resetVisualization,
-    setSpeed,
-    setStep,
-    setAlgorithm,
-  } = useVisualizationStore();
+  const store = useVisualizationStore();
 
-  const animationRef = useRef<NodeJS.Timeout>(null);
+  // Refs для хранения состояния таймера
+  const animationRef = useRef<NodeJS.Timeout | null>(null);
+  const isProcessingRef = useRef<boolean>(false);
+  const lastStepTimeRef = useRef<number>(0);
 
-  // Автоматическое воспроизведение
-  useEffect(() => {
-    if (!isRunning || steps.length === 0) {
-      if (animationRef.current) {
-        clearInterval(animationRef.current);
-      }
+  // Очистка таймера
+  const clearAnimation = useCallback(() => {
+    if (animationRef.current) {
+      clearTimeout(animationRef.current);
+      animationRef.current = null;
+    }
+    isProcessingRef.current = false;
+  }, []);
+
+  // Функция воспроизведения одного шага
+  const playStep = useCallback(() => {
+    if (
+      !store.isRunning ||
+      isProcessingRef.current ||
+      store.steps.length === 0
+    ) {
       return;
     }
 
-    const interval = speeds[speed];
+    const now = Date.now();
+    const interval = Math.max(50, speeds[store.speed]);
 
-    const playNextStep = () => {
-      const hasNext = nextStep();
-      if (!hasNext) {
-        stopVisualization();
+    // Проверяем, прошло ли достаточно времени
+    if (now - lastStepTimeRef.current >= interval) {
+      isProcessingRef.current = true;
+
+      try {
+        const hasNext = store.nextStep();
+        lastStepTimeRef.current = now;
+
+        if (!hasNext) {
+          store.stopVisualization();
+          return;
+        }
+      } finally {
+        isProcessingRef.current = false;
       }
-    };
+    }
 
-    animationRef.current = setInterval(playNextStep, interval);
+    // Планируем следующий шаг, если все еще воспроизводим
+    if (store.isRunning) {
+      const timeSinceLast = Date.now() - lastStepTimeRef.current;
+      const nextDelay = Math.max(10, interval - timeSinceLast);
+      animationRef.current = setTimeout(playStep, nextDelay);
+    }
+  }, [store]);
+
+  // Запуск воспроизведения
+  const startPlayback = useCallback(() => {
+    if (store.steps.length === 0) return;
+
+    clearAnimation();
+    lastStepTimeRef.current = Date.now();
+    animationRef.current = setTimeout(playStep, speeds[store.speed]);
+  }, [store, clearAnimation, playStep]);
+
+  // Остановка воспроизведения
+  const stopPlayback = useCallback(() => {
+    clearAnimation();
+  }, [clearAnimation]);
+
+  // Основной эффект для управления воспроизведением
+  useEffect(() => {
+    console.log("🎬 Main effect:", {
+      isRunning: store.isRunning,
+      steps: store.steps.length,
+      speed: store.speed,
+    });
+
+    if (store.isRunning && store.steps.length > 0) {
+      console.log("🚀 Starting playback");
+      startPlayback();
+    } else {
+      console.log("⏹️ Stopping playback");
+      stopPlayback();
+    }
 
     return () => {
-      if (animationRef.current) {
-        clearInterval(animationRef.current);
-      }
+      console.log("🧹 Cleanup main effect");
+      stopPlayback();
     };
-  }, [isRunning, speed, steps.length, nextStep, stopVisualization]);
+  }, [
+    store.isRunning,
+    store.steps.length,
+    store.speed,
+    startPlayback,
+    stopPlayback,
+  ]);
 
-  // Переименовываем функцию, чтобы избежать конфликта
+  // Эффект для сброса при изменении алгоритма
+  useEffect(() => {
+    return () => {
+      console.log("🔄 Algorithm changed, cleaning up");
+      stopPlayback();
+    };
+  }, [store.currentAlgorithm, stopPlayback]);
+
   const prepareAlgorithm = useCallback(
     (
       algorithm: AlgorithmType,
@@ -64,67 +119,55 @@ export const useVisualization = () => {
       vertices: any[],
       edges: any[]
     ) => {
-      storePrepareAlgorithm(algorithm, startVertexId, vertices, edges);
+      store.prepareAlgorithm(algorithm, startVertexId, vertices, edges);
     },
-    [storePrepareAlgorithm]
+    [store]
   );
 
   const handlePlayPause = useCallback(() => {
-    if (isRunning) {
-      pauseVisualization();
+    if (store.isRunning) {
+      store.pauseVisualization();
     } else {
-      if (step >= steps.length - 1) {
-        setStep(0);
+      if (store.step >= store.steps.length - 1) {
+        store.setStep(0);
       }
-      startVisualization();
+      store.startVisualization();
     }
-  }, [
-    isRunning,
-    step,
-    steps.length,
-    pauseVisualization,
-    setStep,
-    startVisualization,
-  ]);
+  }, [store]);
 
   const handleSpeedChange = useCallback(
     (newSpeed: number) => {
-      setSpeed(newSpeed);
+      store.setSpeed(newSpeed);
     },
-    [setSpeed]
+    [store]
   );
 
-  const canGoNext = step < steps.length - 1;
-  const canGoPrev = step > 0;
-  const totalSteps = steps.length;
+  const canGoNext = store.step < store.steps.length - 1;
+  const canGoPrev = store.step > 0;
+  const totalSteps = store.steps.length;
 
   return {
-    // State
-    isRunning,
-    step,
-    steps,
-    currentStep,
-    startVertexId,
-    currentAlgorithm,
-    speed: speeds[speed],
-    speedIndex: speed,
-
-    // Navigation
+    isRunning: store.isRunning,
+    step: store.step,
+    steps: store.steps,
+    currentStep: store.currentStep,
+    startVertexId: store.startVertexId,
+    currentAlgorithm: store.currentAlgorithm,
+    speed: speeds[store.speed],
+    speedIndex: store.speed,
     canGoNext,
     canGoPrev,
     totalSteps,
-
-    // Actions
-    prepareAlgorithm, // Экспортируем под тем же именем
-    startVisualization,
-    stopVisualization,
-    pauseVisualization,
-    nextStep,
-    prevStep,
-    resetVisualization,
+    prepareAlgorithm,
+    startVisualization: store.startVisualization,
+    stopVisualization: store.stopVisualization,
+    pauseVisualization: store.pauseVisualization,
+    nextStep: store.nextStep,
+    prevStep: store.prevStep,
+    resetVisualization: store.resetVisualization,
     handlePlayPause,
     handleSpeedChange,
-    setStep,
-    setAlgorithm,
+    setStep: store.setStep,
+    setAlgorithm: store.setAlgorithm,
   };
 };

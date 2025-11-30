@@ -1,12 +1,12 @@
 // algorithms/index.ts
 import { Algorithm } from "@/types/algorithm";
 import { dfsAlgorithm } from "./dfs";
-// import { bfsAlgorithm } from "./bfs";
+import { bfsAlgorithm } from "./bfs";
 // Импортируем другие алгоритмы по мере создания
 
 export const algorithms: Record<string, Algorithm> = {
   dfs: dfsAlgorithm,
-  // Добавляем другие алгоритмы
+  bfs: bfsAlgorithm,
 };
 
 export const getAlgorithm = (type: string): Algorithm | null => {

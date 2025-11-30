@@ -298,3 +298,17 @@
 .stepsList::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+/* Добавить в Logs.module.css */
+
+.queueValue {
+  color: #10b981;
+  font-weight: 600;
+  font-family: "Courier New", monospace;
+}
+
+.algorithmType {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-top: 2px;
+  font-weight: 500;
+}

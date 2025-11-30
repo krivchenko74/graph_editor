@@ -1,4 +1,3 @@
-// visualization-store.tsx - версия с асинхронными обновлениями
 // stores/visualization-store.ts
 import { create } from "zustand";
 import { AlgorithmType, AlgorithmStep } from "@/types/algorithm";
@@ -40,7 +39,7 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
   currentStep: null,
   startVertexId: null,
   currentAlgorithm: null,
-  speed: 2,
+  speed: 5, // Индекс по умолчанию для скорости 200ms
 
   prepareAlgorithm: (
     algorithm: AlgorithmType,
@@ -54,6 +53,15 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
       return;
     }
 
+    // Сбрасываем состояние перед подготовкой нового алгоритма
+    set({
+      isRunning: false,
+      step: 0,
+      steps: [],
+      currentStep: null,
+    });
+
+    // Проверяем требования алгоритма
     if (algo.requirements) {
       if (algo.requirements.directed && !edges.some((e) => e.directed)) {
         alert(`Алгоритм ${algo.name} требует направленные ребра`);
@@ -65,21 +73,28 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
       }
     }
 
+    // Генерируем шаги алгоритма
     const steps = algo.start(startVertexId, vertices, edges);
-    console.log("steps: ", steps);
+
+    if (steps.length === 0) {
+      console.error("Algorithm generated no steps");
+      return;
+    }
+
+    console.log(`Generated ${steps.length} steps for algorithm`, algorithm);
+
     set({
-      isRunning: false,
-      step: 0,
       steps,
       currentStep: steps[0],
       startVertexId,
       currentAlgorithm: algorithm,
+      step: 0,
     });
   },
 
   startVisualization: () => {
-    const { steps } = get();
-    if (steps.length > 0) {
+    const { steps, step } = get();
+    if (steps.length > 0 && step < steps.length) {
       set({ isRunning: true });
     }
   },
@@ -88,8 +103,7 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
     set({
       isRunning: false,
       step: 0,
-      currentStep: null,
-      currentAlgorithm: null,
+      currentStep: get().steps[0] || null,
     });
   },
 
@@ -104,7 +118,7 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
     if (step < steps.length - 1) {
       const newStep = step + 1;
 
-      // КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: объединяем обновления в один set
+      // Синхронное обновление состояния
       set({
         step: newStep,
         currentStep: steps[newStep],
@@ -112,7 +126,11 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
 
       return true;
     } else {
-      set({ isRunning: false });
+      // Достигнут конец - останавливаем воспроизведение
+      set({
+        isRunning: false,
+        currentStep: steps[steps.length - 1],
+      });
       return false;
     }
   },
@@ -126,6 +144,7 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
       set({
         step: newStep,
         currentStep: steps[newStep],
+        isRunning: false, // Пауза при переходе назад
       });
     }
   },
@@ -142,7 +161,9 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
   },
 
   setSpeed: (speed: number) => {
-    set({ speed });
+    // Ограничиваем скорость в допустимых пределах
+    const clampedSpeed = Math.max(0, Math.min(10, speed));
+    set({ speed: clampedSpeed });
   },
 
   setStep: (step: number) => {
@@ -151,6 +172,7 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
       set({
         step,
         currentStep: steps[step],
+        isRunning: false, // Пауза при ручном переходе
       });
     }
   },

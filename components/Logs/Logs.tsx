@@ -4,6 +4,7 @@ import styles from "./Logs.module.css";
 import { useGraphStore } from "@/stores/graph-store";
 import { ChevronDown } from "lucide-react";
 import { useVisualization } from "@/hooks/useVisualization";
+
 interface AlgorithmLogProps {
   steps: AlgorithmStep[];
   currentStepIndex: number;
@@ -20,12 +21,58 @@ const Logs: React.FC<AlgorithmLogProps> = ({
   const { graph } = useGraphStore();
   const vertices = graph.vertices;
   const isRunning = useVisualization().totalSteps != 0;
+
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
   };
 
   const getVertexText = (vertexId: string): string => {
     return vertices.find((v) => v.id === vertexId)?.text || vertexId;
+  };
+
+  // Автоматическое определение типа алгоритма на основе структуры данных
+  const detectAlgorithmType = (): "dfs" | "bfs" => {
+    // Проверяем первый шаг, где есть структура данных
+    const stepWithData = steps.find((step) => step.stack || step.queue);
+    if (stepWithData?.queue !== undefined) {
+      return "bfs";
+    }
+    return "dfs"; // по умолчанию
+  };
+
+  const algorithmType = detectAlgorithmType();
+
+  // Функция для получения структуры данных в зависимости от алгоритма
+  const getDataStructure = (step: AlgorithmStep) => {
+    if (algorithmType === "bfs") {
+      return {
+        data: step.queue || [],
+        label: "Очередь",
+        className: styles.queueValue,
+      };
+    } else {
+      return {
+        data: step.stack || [],
+        label: "Стек",
+        className: styles.stackValue,
+      };
+    }
+  };
+
+  // Функция для получения размера структуры данных
+  const getDataStructureSize = (step: AlgorithmStep) => {
+    if (algorithmType === "bfs") {
+      return step.queue?.length || 0;
+    } else {
+      return step.stack?.length || 0;
+    }
+  };
+
+  // Функция для получения названия алгоритма
+  const getAlgorithmName = () => {
+    return algorithmType === "bfs"
+      ? "BFS (поиск в ширину)"
+      : "DFS (поиск в глубину)";
   };
 
   return (
@@ -47,7 +94,10 @@ const Logs: React.FC<AlgorithmLogProps> = ({
                 justifyContent: "space-between",
               }}
             >
-              <h3 className={styles.title}>Ход выполнения алгоритма</h3>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <h3 className={styles.title}>Ход выполнения алгоритма</h3>
+                <div className={styles.algorithmType}>{getAlgorithmName()}</div>
+              </div>
               <ChevronDown className={styles.collapseIcon} />
             </div>
 
@@ -70,63 +120,69 @@ const Logs: React.FC<AlgorithmLogProps> = ({
           <div className={styles.history}>
             <div className={styles.historyLabel}>История выполнения:</div>
             <div className={styles.stepsList}>
-              {steps.slice(0, currentStepIndex + 1).map((step, index) => (
-                <div
-                  key={index}
-                  className={`${styles.stepItem} ${
-                    index === currentStepIndex ? styles.currentStepItem : ""
-                  }`}
-                >
-                  <div className={styles.stepNumber}>Шаг {index + 1}</div>
-                  <div className={styles.stepDescription}>
-                    {step.description}
-                  </div>
+              {steps.slice(0, currentStepIndex + 1).map((step, index) => {
+                const dataStructure = getDataStructure(step);
 
-                  {/* Дополнительная информация о шаге */}
-                  {(step.stack!.length > 0 ||
-                    step.visitedVertices?.length > 0) && (
-                    <div className={styles.stepDetails}>
-                      {step.stack && step.stack.length > 0 && (
-                        <div className={styles.detailItem}>
-                          <span className={styles.detailLabel}>Стек:</span>
-                          <span className={styles.stackValue}>
-                            [
-                            {step.stack
-                              .map((id) => getVertexText(id))
-                              .join(", ")}
-                            ]
-                          </span>
-                        </div>
-                      )}
+                return (
+                  <div
+                    key={index}
+                    className={`${styles.stepItem} ${
+                      index === currentStepIndex ? styles.currentStepItem : ""
+                    }`}
+                  >
+                    <div className={styles.stepNumber}>Шаг {index + 1}</div>
+                    <div className={styles.stepDescription}>
+                      {step.description}
+                    </div>
 
-                      {step.currentVertexId && (
-                        <div className={styles.detailItem}>
-                          <span className={styles.detailLabel}>
-                            Текущая вершина:
-                          </span>
-                          <span className={styles.vertexValue}>
-                            {getVertexText(step.currentVertexId)}
-                          </span>
-                        </div>
-                      )}
-
-                      {step.visitedVertices &&
-                        step.visitedVertices.length > 0 && (
+                    {/* Дополнительная информация о шаге */}
+                    {(dataStructure.data.length > 0 ||
+                      step.visitedVertices?.length > 0) && (
+                      <div className={styles.stepDetails}>
+                        {dataStructure.data.length > 0 && (
                           <div className={styles.detailItem}>
                             <span className={styles.detailLabel}>
-                              Посещено:
+                              {dataStructure.label}:
                             </span>
-                            <span className={styles.visitedValue}>
-                              {step.visitedVertices
+                            <span className={dataStructure.className}>
+                              [
+                              {dataStructure.data
                                 .map((id) => getVertexText(id))
                                 .join(", ")}
+                              ]
                             </span>
                           </div>
                         )}
-                    </div>
-                  )}
-                </div>
-              ))}
+
+                        {step.currentVertexId && (
+                          <div className={styles.detailItem}>
+                            <span className={styles.detailLabel}>
+                              Текущая вершина:
+                            </span>
+                            <span className={styles.vertexValue}>
+                              {getVertexText(step.currentVertexId)}
+                            </span>
+                          </div>
+                        )}
+
+                        {step.visitedVertices &&
+                          step.visitedVertices.length > 0 && (
+                            <div className={styles.detailItem}>
+                              <span className={styles.detailLabel}>
+                                Посещено:
+                              </span>
+                              <span className={styles.visitedValue}>
+                                {step.visitedVertices
+                                  .map((id) => getVertexText(id))
+                                  .join(", ")}
+                              </span>
+                            </div>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -148,9 +204,13 @@ const Logs: React.FC<AlgorithmLogProps> = ({
                   </span>
                 </div>
                 <div className={styles.statItem}>
-                  <span className={styles.statLabel}>Размер стека:</span>
+                  <span className={styles.statLabel}>
+                    {algorithmType === "bfs"
+                      ? "Размер очереди:"
+                      : "Размер стека:"}
+                  </span>
                   <span className={styles.statValue}>
-                    {currentStep.stack?.length || 0}
+                    {getDataStructureSize(currentStep)}
                   </span>
                 </div>
               </div>
