@@ -11,7 +11,14 @@ import { Download, Upload, Trash2 } from "lucide-react";
 
 export default function Header() {
   const { clearGraph, graph } = useGraphStore();
-  const { prepareAlgorithm, currentAlgorithm } = useVisualization(); // Используем prepareAlgorithm
+  const {
+    prepareAlgorithm,
+    currentAlgorithm,
+    startSelectingStartVertex,
+    startSelectingEndVertex,
+    startVertexId,
+    endVertexId,
+  } = useVisualization(); // Используем prepareAlgorithm
 
   const algorithms = getAvailableAlgorithms();
   console.log(algorithms);
@@ -22,52 +29,52 @@ export default function Header() {
       return;
     }
 
+    const algorithm = algorithmType as any;
+
     // Для алгоритмов, требующих выбор начальной вершины
-    if (algorithmType === "dfs") {
-      const startVertex = graph.vertices[0];
-      if (startVertex) {
-        prepareAlgorithm(
-          algorithmType as any,
-          startVertex.id,
-          graph.vertices,
-          graph.edges
-        );
-      }
-    } else if (algorithmType === "bfs") {
-      const startVertex = graph.vertices[0];
-      if (startVertex) {
-        prepareAlgorithm(
-          algorithmType as any,
-          startVertex.id,
-          graph.vertices,
-          graph.edges
-        );
-      }
-    } else if (algorithmType === "mst") {
-      // Проверяем, что граф неориентированный и взвешенный для MST
-      const hasDirectedEdges = graph.edges.some((edge) => edge.directed);
-      if (hasDirectedEdges) {
-        alert("Алгоритм Прима работает только с неориентированными графами");
+    if (algorithm === "dfs" || algorithm === "bfs" || algorithm === "mst") {
+      if (!startVertexId) {
+        // Запускаем процесс выбора стартовой вершины
+        startSelectingStartVertex();
         return;
       }
 
+      // Запускаем алгоритм с выбранной стартовой вершиной
+      prepareAlgorithm(
+        algorithm,
+        startVertexId,
+        null,
+        graph.vertices,
+        graph.edges
+      );
+    }
+    // Для алгоритмов, требующих обе вершины
+    else if (algorithm === "shortest-path") {
+      if (!startVertexId) {
+        startSelectingStartVertex();
+        return;
+      }
+      if (!endVertexId) {
+        startSelectingEndVertex();
+        return;
+      }
+
+      // Проверяем, что граф взвешенный для алгоритма кратчайшего пути
       const hasUnweightedEdges = graph.edges.some(
         (edge) => edge.weight === undefined || edge.weight === null
       );
       if (hasUnweightedEdges) {
-        alert("Алгоритм Прима требует задания весов для всех рёбер");
+        alert("Алгоритм кратчайшего пути требует задания весов для всех рёбер");
         return;
       }
 
-      const startVertex = graph.vertices[0];
-      if (startVertex) {
-        prepareAlgorithm(
-          algorithmType as any,
-          startVertex.id,
-          graph.vertices,
-          graph.edges
-        );
-      }
+      prepareAlgorithm(
+        algorithm,
+        startVertexId,
+        endVertexId,
+        graph.vertices,
+        graph.edges
+      );
     }
   };
 
@@ -163,6 +170,7 @@ export default function Header() {
   return (
     <header className={styles.header}>
       <GraphActionsMenu actions={actions} label="Действия с графом" />
+
       <Select
         placeholder="Алгоритмы"
         value={currentAlgorithm || ""}

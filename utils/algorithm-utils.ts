@@ -21,10 +21,21 @@ export const createStep = (
 ): AlgorithmStep => ({
   ...prevStep,
   ...updates,
-  // Гарантируем, что массивы всегда определены
-  visitedVertices: updates.visitedVertices || prevStep.visitedVertices,
-  visitedEdges: updates.visitedEdges || prevStep.visitedEdges,
+  // Исправлено: проверяем именно на undefined, а не на falsy
+  visitedVertices:
+    updates.visitedVertices !== undefined
+      ? updates.visitedVertices
+      : prevStep.visitedVertices,
+  visitedEdges:
+    updates.visitedEdges !== undefined
+      ? updates.visitedEdges
+      : prevStep.visitedEdges,
   highlightedVertices:
-    updates.highlightedVertices || prevStep.highlightedVertices || [],
-  highlightedEdges: updates.highlightedEdges || prevStep.highlightedEdges || [],
+    updates.highlightedVertices !== undefined
+      ? updates.highlightedVertices
+      : prevStep.highlightedVertices,
+  highlightedEdges:
+    updates.highlightedEdges !== undefined
+      ? updates.highlightedEdges
+      : prevStep.highlightedEdges,
 });

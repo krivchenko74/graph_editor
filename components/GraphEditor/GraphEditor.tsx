@@ -24,8 +24,20 @@ export default function GraphEditor() {
     null
   );
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const { isRunning, currentStep, steps } = useVisualization();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const {
+    isRunning,
+    currentStep,
+    steps,
+    isSelectingStartVertex,
+    isSelectingEndVertex,
+    setStartVertex,
+    setEndVertex,
+    startVertexId,
+    endVertexId,
+    cancelVertexSelection,
+  } = useVisualization();
 
   useGraphStorage();
 
@@ -41,7 +53,8 @@ export default function GraphEditor() {
 
   // ==== CREATE VERTEX (double click) ====
   const handleCanvasDoubleClick = (e: React.MouseEvent) => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || isSelectingStartVertex || isSelectingEndVertex)
+      return;
 
     const rect = containerRef.current.getBoundingClientRect();
     const worldX = (e.clientX - rect.left - offset.x) / zoom;
@@ -52,7 +65,7 @@ export default function GraphEditor() {
       x: worldX,
       y: worldY,
       text: (graph.vertices.length + 1).toString(),
-      index: graph.vertices.length, // автоматический индекс
+      index: graph.vertices.length,
     };
 
     addVertex(newVertex);
@@ -60,6 +73,35 @@ export default function GraphEditor() {
 
   // ==== CLICK ON VERTEX (edges) ====
   const handleVertexClick = (id: string, event?: React.MouseEvent) => {
+    if (isRunning) return;
+
+    const isAltPressed = event ? event.altKey : false;
+
+    // Alt+клик - выбор стартовой/конечной вершины
+    if (isAltPressed) {
+      console.log("pressed");
+      // Если уже выбрана как стартовая - снимаем выбор
+      if (id === startVertexId) {
+        setStartVertex(null);
+        return;
+      }
+      // Если уже выбрана как конечная - снимаем выбор
+      if (id === endVertexId) {
+        setEndVertex(null);
+        return;
+      }
+
+      // Выбираем вершину
+      if (!startVertexId) {
+        setStartVertex(id);
+      } else if (!endVertexId) {
+        setEndVertex(id);
+      }
+      return;
+    }
+    console.log(startVertexId, endVertexId);
+
+    // Обычный клик - существующая логика создания рёбер
     if (!edgeStartVertexId) {
       setEdgeStartVertexId(id);
       return;
@@ -69,19 +111,16 @@ export default function GraphEditor() {
       return;
     }
 
-    // Проверяем, нажата ли клавиша Alt в момент клика
     const isShiftPressed = event ? event.shiftKey : false;
-
     const newEdge: TEdge = {
       id: Date.now().toString(),
       source: edgeStartVertexId,
       target: id,
-      directed: isShiftPressed, // направленное только при нажатом Alt
+      directed: isShiftPressed,
       weight: 1,
       curvature: 0,
     };
     addEdge(newEdge);
-
     setEdgeStartVertexId(null);
   };
 
@@ -93,6 +132,11 @@ export default function GraphEditor() {
     ) {
       setEdgeStartVertexId(null);
       setSelectedEdgeId(null);
+
+      // Отменяем выбор вершин при клике на пустую область
+      if (isSelectingStartVertex || isSelectingEndVertex) {
+        cancelVertexSelection();
+      }
     }
   };
 
@@ -179,7 +223,7 @@ export default function GraphEditor() {
     };
   }, []);
 
-  // ==== UPDATE VERTEX POSITION (оптимизированная версия) ====
+  // ==== UPDATE VERTEX POSITION ====
   const handleVertexUpdate = (id: string, updates: Partial<TVertex>) => {
     updateVertex(id, updates);
   };
@@ -188,6 +232,7 @@ export default function GraphEditor() {
   const handleEdgeUpdate = (id: string, updates: Partial<TEdge>) => {
     updateEdge(id, updates);
   };
+
   // ==== DELETE VERTEX ====
   const handleVertexDelete = (id: string) => {
     deleteVertex(id);
@@ -199,6 +244,16 @@ export default function GraphEditor() {
         containerRef.current.clientWidth / zoom
       } ${containerRef.current.clientHeight / zoom}`
     : "0 0 1000 1000";
+
+  const getSelectionIndicator = () => {
+    if (isSelectingStartVertex) {
+      return "🟢 Выберите стартовую вершину";
+    }
+    if (isSelectingEndVertex) {
+      return "🔴 Выберите конечную вершину";
+    }
+    return null;
+  };
 
   return (
     <div
@@ -215,7 +270,20 @@ export default function GraphEditor() {
         cursor: isDragging ? "grabbing" : isShiftPressed ? "grab" : "default",
       }}
     >
-      {/* === HTML VERTEX LAYER (пиксельные координаты, без scale!) === */}
+      {/* Индикатор выбора вершин */}
+      {(isSelectingStartVertex || isSelectingEndVertex) && (
+        <div className={styles.selectionIndicator}>
+          {getSelectionIndicator()}
+          <button
+            onClick={cancelVertexSelection}
+            className={styles.cancelSelectionButton}
+          >
+            Отмена
+          </button>
+        </div>
+      )}
+
+      {/* === HTML VERTEX LAYER === */}
       <div
         className={styles.canvas}
         style={{
@@ -233,6 +301,7 @@ export default function GraphEditor() {
             currentStep,
             edgeStartVertexId
           );
+
           return (
             <div
               key={v.id}
@@ -243,12 +312,11 @@ export default function GraphEditor() {
                 zoom={zoom}
                 offset={offset}
                 isSelected={edgeStartVertexId === v.id}
-                onClick={(id, event) => {
-                  if (isRunning) return;
-                  handleVertexClick(id, event);
-                }}
+                onClick={(id, event) => handleVertexClick(id, event)}
                 onUpdate={handleVertexUpdate}
                 onDelete={handleVertexDelete}
+                isStartVertex={startVertexId == v.id}
+                isEndVertex={endVertexId == v.id}
                 animationColor={animationColor}
               />
             </div>
@@ -293,6 +361,7 @@ export default function GraphEditor() {
           );
         })}
       </svg>
+
       <Logs steps={steps} currentStepIndex={steps.indexOf(currentStep!)} />
     </div>
   );

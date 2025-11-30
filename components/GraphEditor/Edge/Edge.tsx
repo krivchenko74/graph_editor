@@ -88,6 +88,15 @@ export const Edge = ({
   const pathD = `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
   const arrowId = `arrow-${edge.id}`;
 
+  // Определяем цвет ребра
+  const edgeColor =
+    animationColor ||
+    (isHighlighted
+      ? EdgeColor.HIGHLIGHTED
+      : isSelected
+      ? EdgeColor.SELECTED
+      : EdgeColor.DEFAULT);
+
   // === Обработка удаления по Backspace/Delete ===
   useEffect(() => {
     if (!isSelected) return;
@@ -200,36 +209,30 @@ export const Edge = ({
           >
             <path
               d="M0,0 L0,6 L6,3 z"
-              fill={isSelected ? "#ef4444" : "#64748b"}
+              fill={
+                edgeColor === EdgeColor.SELECTED
+                  ? "#ef4444"
+                  : edgeColor === EdgeColor.HIGHLIGHTED
+                  ? "#f97316"
+                  : edgeColor === EdgeColor.VISITED
+                  ? "#22c55e"
+                  : edgeColor === EdgeColor.PATH
+                  ? "#0ea5e9"
+                  : "#64748b"
+              }
             />
           </marker>
         </defs>
       )}
 
-      {/* Основное ребро - тонкое для отображения */}
+      {/* Основное ребро - теперь с pointerEvents для обработки анимации */}
       <path
         d={pathD}
         fill="none"
-        stroke={
-          animationColor ||
-          (isHighlighted
-            ? EdgeColor.HIGHLIGHTED
-            : isSelected
-            ? EdgeColor.SELECTED
-            : EdgeColor.DEFAULT)
-        }
+        stroke={edgeColor}
         strokeWidth={isSelected ? "3.5" : "2.5"}
         markerEnd={edge.directed ? `url(#${arrowId})` : undefined}
-        pointerEvents="none" // Не перехватывает события
-      />
-
-      {/* Невидимое ребро с большим паддингом для перетаскивания */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke="transparent"
-        strokeWidth="20" // Большой паддинг для легкого клика
-        pointerEvents="stroke" // Убрали markerEnd с этого пути
+        pointerEvents="stroke" // ← ИЗМЕНЕНИЕ: теперь обрабатывает события
         cursor={isDragging ? "ns-resize" : "pointer"}
         onClick={handleEdgeClick}
         onMouseDown={handleEdgeMouseDown}

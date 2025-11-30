@@ -10,6 +10,7 @@ export const mstAlgorithm: Algorithm = {
 
   start: (
     startVertexId: string,
+    endVertexId: string | null,
     vertices: TVertex[],
     edges: TEdge[]
   ): AlgorithmStep[] => {
@@ -18,11 +19,20 @@ export const mstAlgorithm: Algorithm = {
     };
 
     const steps: AlgorithmStep[] = [];
+
+    // Создаём карту вершин для быстрого доступа
+    const vertexMap = new Map(vertices.map((v) => [v.id, v]));
+
+    // Фильтруем рёбра, чтобы оставить только те, у которых обе вершины существуют
+    const validEdges = edges.filter(
+      (edge) => vertexMap.has(edge.source) && vertexMap.has(edge.target)
+    );
+
     const visited = new Set<string>([startVertexId]);
     let totalWeight = 0;
 
     // Начальный шаг
-    let currentStep = createInitialStep(vertices, edges);
+    let currentStep = createInitialStep(vertices, validEdges);
     currentStep = {
       ...currentStep,
       visitedVertices: [startVertexId],
@@ -38,7 +48,7 @@ export const mstAlgorithm: Algorithm = {
 
     while (visited.size < vertices.length) {
       // Находим все рёбра, соединяющие посещённые и непосещённые вершины
-      const candidateEdges = edges.filter((edge) => {
+      const candidateEdges = validEdges.filter((edge) => {
         const sourceVisited = visited.has(edge.source);
         const targetVisited = visited.has(edge.target);
         return (
@@ -48,7 +58,7 @@ export const mstAlgorithm: Algorithm = {
 
       if (candidateEdges.length === 0) {
         currentStep = createStep(currentStep, {
-          description: `❌ Нет доступных рёбер для добавления. Граф может быть несвязным.`,
+          description: `❌ Нет доступных рёбер для добавления. Граф может быть несвязным. Посещено ${visited.size} из ${vertices.length} вершин.`,
         });
         steps.push(currentStep);
         break;
@@ -59,9 +69,16 @@ export const mstAlgorithm: Algorithm = {
         edge.weight < min.weight ? edge : min
       );
 
-      const newVertex = visited.has(minEdge.source)
-        ? minEdge.target
-        : minEdge.source;
+      // Определяем, какая вершина новая (не посещённая)
+      const isSourceVisited = visited.has(minEdge.source);
+      const isTargetVisited = visited.has(minEdge.target);
+
+      let newVertex: string;
+      if (!isSourceVisited) {
+        newVertex = minEdge.source;
+      } else {
+        newVertex = minEdge.target;
+      }
 
       // Шаг: подсветка найденного минимального ребра
       currentStep = createStep(currentStep, {
@@ -70,11 +87,11 @@ export const mstAlgorithm: Algorithm = {
           minEdge.weight
         } между ${getVertexText(minEdge.source)} и ${getVertexText(
           minEdge.target
-        )}`,
+        )}. Добавляем вершину ${getVertexText(newVertex)}`,
       });
       steps.push(currentStep);
 
-      // Добавляем ребро в MST (используем visitedEdges)
+      // Добавляем ребро в MST и новую вершину в посещённые
       visited.add(newVertex);
       totalWeight += minEdge.weight;
 
@@ -92,7 +109,7 @@ export const mstAlgorithm: Algorithm = {
       });
       steps.push(currentStep);
 
-      // Показываем текущее состояние кандидатов
+      // Показываем текущее состояние
       if (visited.size < vertices.length) {
         currentStep = createStep(currentStep, {
           description: `📊 Текущее состояние: посещено ${visited.size} из ${vertices.length} вершин. Ищем следующее минимальное ребро...`,
@@ -101,12 +118,16 @@ export const mstAlgorithm: Algorithm = {
       }
     }
 
-    // Финальный шаг
+    // Финальный шаг - проверяем, построили ли мы полное MST
+    const isCompleteMST = visited.size === vertices.length;
+
     currentStep = createStep(currentStep, {
       metadata: {
         mstTotalWeight: totalWeight,
       },
-      description: `🎉 Построение завершено! Минимальный вес остовного дерева: ${totalWeight}. Использовано ${currentStep.visitedEdges.length} рёбер.`,
+      description: isCompleteMST
+        ? `🎉 Построение завершено! Минимальный вес остовного дерева: ${totalWeight}. Использовано ${currentStep.visitedEdges.length} рёбер.`
+        : `⚠️ Построение завершено частично! Граф несвязный. Минимальный вес: ${totalWeight}. Посещено ${visited.size} из ${vertices.length} вершин.`,
     });
     steps.push(currentStep);
 

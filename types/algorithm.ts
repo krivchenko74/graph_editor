@@ -1,14 +1,4 @@
 import { TVertex, TEdge } from "./graph";
-
-export type AlgorithmType =
-  | "bfs"
-  | "dfs"
-  | "dijkstra"
-  | "bellman-ford"
-  | "ford-fulkerson"
-  | "mst"
-  | "kruskal";
-
 // Универсальный шаг для ВСЕХ алгоритмов
 export interface AlgorithmStep {
   // Базовые данные графа
@@ -45,20 +35,31 @@ export interface AlgorithmStep {
   metadata?: Record<string, any>;
 }
 
+// types/algorithm.ts
+export type AlgorithmType = "dfs" | "bfs" | "mst" | "shortest-path"; // добавить новый тип
+
+export interface AlgorithmRequirements {
+  directed?: boolean;
+  weighted?: boolean;
+  startVertex?: boolean;
+  endVertex?: boolean; // добавить требование конечной вершины
+}
+
+export interface AlgorithmRequirements {
+  directed?: boolean;
+  weighted?: boolean;
+  endVertex?: boolean;
+}
+
 export interface Algorithm {
   name: string;
   type: AlgorithmType;
   description: string;
+  requirements?: AlgorithmRequirements;
   start: (
-    startVertexId: string, // Для некоторых алгоритмов может быть не нужен
+    startVertexId: string,
+    endVertexId: string | null,
     vertices: TVertex[],
-    edges: TEdge[],
-    options?: any // Дополнительные параметры (вес, пропускная способность и т.д.)
+    edges: TEdge[]
   ) => AlgorithmStep[];
-  requirements?: {
-    directed?: boolean;
-    weighted?: boolean;
-    connected?: boolean;
-    startVertexRequired?: boolean; // Нужна ли стартовая вершина
-  };
 }

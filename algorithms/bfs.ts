@@ -10,6 +10,7 @@ export const bfsAlgorithm: Algorithm = {
 
   start: (
     startVertexId: string,
+    endVertexId: string | null,
     vertices: TVertex[],
     edges: TEdge[]
   ): AlgorithmStep[] => {
@@ -20,8 +21,9 @@ export const bfsAlgorithm: Algorithm = {
     const visited = new Set<string>();
     const queue: string[] = [startVertexId];
 
-    // Храним информацию о родительских вершинах и рёбрах
+    // Храним информацию о родительских рёбрах
     const parentEdgeMap = new Map<string, string>(); // vertexId -> edgeId
+    const usedEdges = new Set<string>(); // Все использованные рёбра
 
     // Начальный шаг
     let currentStep = createInitialStep(vertices, edges);
@@ -43,18 +45,21 @@ export const bfsAlgorithm: Algorithm = {
 
         visited.add(currentVertexId);
 
+        // Добавляем ребро в использованные (если оно есть)
+        if (incomingEdge) {
+          usedEdges.add(incomingEdge);
+        }
+
         // Шаг: посещение вершины
         currentStep = createStep(currentStep, {
           currentVertexId,
           visitedVertices: [...visited],
-          visitedEdges: incomingEdge
-            ? [...currentStep.visitedEdges, incomingEdge]
-            : currentStep.visitedEdges,
+          visitedEdges: [...usedEdges], // Явно передаём все использованные рёбра
           queue: [...queue],
           description: incomingEdge
             ? `📥 Извлекаем вершину ${getVertexText(
                 currentVertexId
-              )} из очереди и посещаем её`
+              )} из очереди и посещаем её (пришли по ребру ${incomingEdge})`
             : `📥 Начинаем с вершины ${getVertexText(currentVertexId)}`,
         });
         steps.push(currentStep);
@@ -125,7 +130,7 @@ export const bfsAlgorithm: Algorithm = {
     currentStep = createStep(currentStep, {
       currentVertexId: undefined,
       queue: [],
-      description: `✅ Обход завершен! Посещено ${visited.size} вершин`,
+      description: `✅ Обход завершен! Посещено ${visited.size} вершин и использовано ${usedEdges.size} рёбер`,
     });
     steps.push(currentStep);
 

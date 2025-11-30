@@ -20,7 +20,9 @@ type VertexProps = {
   onDelete?: (id: string) => void;
   onClick: (id: string, event?: React.MouseEvent) => void;
   isSelected: boolean;
-  animationColor?: VertexColor; // Цвет для анимации
+  animationColor?: VertexColor;
+  isStartVertex?: boolean;
+  isEndVertex?: boolean;
 };
 
 export default function Vertex({
@@ -32,6 +34,8 @@ export default function Vertex({
   onClick,
   isSelected,
   animationColor,
+  isStartVertex = false,
+  isEndVertex = false,
 }: VertexProps) {
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +46,7 @@ export default function Vertex({
     y: vertex.y,
   });
   const isDraggingRef = useRef(false);
-  const hasMovedRef = useRef(false); // Новый ref для отслеживания движения
+  const hasMovedRef = useRef(false);
 
   // Синхронизируем временную позицию с актуальной вершиной
   useEffect(() => {
@@ -65,7 +69,7 @@ export default function Vertex({
     e.stopPropagation();
 
     isDraggingRef.current = true;
-    hasMovedRef.current = false; // Сбрасываем флаг движения
+    hasMovedRef.current = false;
     const startClientX = e.clientX;
     const startClientY = e.clientY;
 
@@ -78,17 +82,14 @@ export default function Vertex({
       const dx = moveEvent.clientX - startClientX;
       const dy = moveEvent.clientY - startClientY;
 
-      // Если движение превышает порог, отмечаем что вершина была перемещена
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
         hasMovedRef.current = true;
       }
 
-      // Обновляем временную позицию для плавного отображения
       const newScreenX = startScreenX + dx;
       const newScreenY = startScreenY + dy;
       setTempPosition({ x: newScreenX, y: newScreenY });
 
-      // Конвертируем в мировые координаты и обновляем основное состояние
       const worldX = (newScreenX - offset.x) / zoom;
       const worldY = (newScreenY - offset.y) / zoom;
       onUpdate(vertex.id, { x: worldX, y: worldY });
@@ -109,7 +110,7 @@ export default function Vertex({
 
     // Если вершина была перемещена, не вызываем onClick
     if (hasMovedRef.current) {
-      hasMovedRef.current = false; // Сбрасываем флаг
+      hasMovedRef.current = false;
       return;
     }
 
@@ -155,22 +156,65 @@ export default function Vertex({
   const displayX = isDraggingRef.current ? tempPosition.x : vertex.x;
   const displayY = isDraggingRef.current ? tempPosition.y : vertex.y;
 
+  // Определяем дополнительные классы для стилей
+  const getVertexClasses = () => {
+    const classes = [styles.vertex];
+
+    if (isStartVertex) classes.push(styles.startVertex);
+    if (isEndVertex) classes.push(styles.endVertex);
+    if (isSelected) classes.push(styles.selected);
+
+    return classes.join(" ");
+  };
+
+  // Определяем border color с приоритетами
+  const getBorderColor = () => {
+    // Самый высокий приоритет - анимация
+    if (animationColor) {
+      return animationColor;
+    }
+
+    // Затем специальные статусы вершин
+    if (isStartVertex) return VertexColor.START;
+    if (isEndVertex) return VertexColor.END;
+
+    // Затем выделение для создания ребер
+    if (isSelected) return VertexColor.SELECTED;
+
+    // По умолчанию
+    return VertexColor.DEFAULT;
+  };
+
+  // Получаем подсказку для вершины
+  const getTitle = () => {
+    if (isStartVertex) return `Стартовая вершина: ${vertex.text}`;
+    if (isEndVertex) return `Конечная вершина: ${vertex.text}`;
+    return `Вершина: ${vertex.text}`;
+  };
+
   return (
     <div
-      onClick={(e) => handleClick(e)} // Используем обёртку вместо прямого вызова
-      className={styles.vertex}
+      onClick={handleClick}
+      className={getVertexClasses()}
       style={{
         left: displayX - 20,
         top: displayY - 20,
-        borderColor:
-          animationColor ||
-          (isSelected ? VertexColor.SELECTED : VertexColor.DEFAULT),
-        cursor: isDraggingRef.current ? "grabbing" : "grab",
+        borderColor: getBorderColor(),
+        cursor: isDraggingRef.current ? "grabbing" : "pointer",
         transition: isDraggingRef.current ? "none" : "all 0.15s ease",
       }}
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
+      title={getTitle()}
     >
+      {/* Индикатор специального статуса */}
+      {(isStartVertex || isEndVertex) && (
+        <div className={styles.statusIndicator}>
+          {isStartVertex && "🚀"}
+          {isEndVertex && "🎯"}
+        </div>
+      )}
+
       {isEditing ? (
         <input
           ref={inputRef}
@@ -183,7 +227,7 @@ export default function Vertex({
           className={styles.input}
         />
       ) : (
-        <span className={styles.text}>{vertex.text || "Вершина"}</span>
+        <span className={styles.text}>{vertex.text}</span>
       )}
     </div>
   );

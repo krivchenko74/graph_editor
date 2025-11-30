@@ -37,7 +37,6 @@ export const useVisualization = () => {
     const now = Date.now();
     const interval = Math.max(50, speeds[store.speed]);
 
-    // Проверяем, прошло ли достаточно времени
     if (now - lastStepTimeRef.current >= interval) {
       isProcessingRef.current = true;
 
@@ -54,7 +53,6 @@ export const useVisualization = () => {
       }
     }
 
-    // Планируем следующий шаг, если все еще воспроизводим
     if (store.isRunning) {
       const timeSinceLast = Date.now() - lastStepTimeRef.current;
       const nextDelay = Math.max(10, interval - timeSinceLast);
@@ -78,22 +76,13 @@ export const useVisualization = () => {
 
   // Основной эффект для управления воспроизведением
   useEffect(() => {
-    console.log("🎬 Main effect:", {
-      isRunning: store.isRunning,
-      steps: store.steps.length,
-      speed: store.speed,
-    });
-
     if (store.isRunning && store.steps.length > 0) {
-      console.log("🚀 Starting playback");
       startPlayback();
     } else {
-      console.log("⏹️ Stopping playback");
       stopPlayback();
     }
 
     return () => {
-      console.log("🧹 Cleanup main effect");
       stopPlayback();
     };
   }, [
@@ -107,21 +96,49 @@ export const useVisualization = () => {
   // Эффект для сброса при изменении алгоритма
   useEffect(() => {
     return () => {
-      console.log("🔄 Algorithm changed, cleaning up");
       stopPlayback();
     };
   }, [store.currentAlgorithm, stopPlayback]);
 
+  // Подготовка алгоритма
   const prepareAlgorithm = useCallback(
     (
       algorithm: AlgorithmType,
       startVertexId: string,
+      endVertexId: string | null,
       vertices: any[],
       edges: any[]
     ) => {
-      store.prepareAlgorithm(algorithm, startVertexId, vertices, edges);
+      store.prepareAlgorithm(
+        algorithm,
+        startVertexId,
+        endVertexId,
+        vertices,
+        edges
+      );
     },
     [store]
+  );
+
+  // Запуск алгоритма с автоматической подготовкой
+  const startAlgorithm = useCallback(
+    (algorithm: AlgorithmType, vertices: any[], edges: any[]) => {
+      if (!store.startVertexId) {
+        console.error("No start vertex selected");
+        return;
+      }
+
+      const endVertexId = store.endVertexId;
+      prepareAlgorithm(
+        algorithm,
+        store.startVertexId,
+        endVertexId,
+        vertices,
+        edges
+      );
+      store.startVisualization();
+    },
+    [store, prepareAlgorithm]
   );
 
   const handlePlayPause = useCallback(() => {
@@ -142,32 +159,92 @@ export const useVisualization = () => {
     [store]
   );
 
+  // Функции для управления выбором вершин
+  const setStartVertex = useCallback(
+    (vertexId: string | null) => {
+      store.setStartVertex(vertexId);
+    },
+    [store]
+  );
+
+  const setEndVertex = useCallback(
+    (vertexId: string | null) => {
+      store.setEndVertex(vertexId);
+    },
+    [store]
+  );
+
+  const startSelectingStartVertex = useCallback(() => {
+    store.startSelectingStartVertex();
+  }, [store]);
+
+  const startSelectingEndVertex = useCallback(() => {
+    store.startSelectingEndVertex();
+  }, [store]);
+
+  const cancelVertexSelection = useCallback(() => {
+    store.cancelVertexSelection();
+  }, [store]);
+
+  // Проверка готовности алгоритма
+  const isAlgorithmReady = useCallback(
+    (algorithm: AlgorithmType): boolean => {
+      if (!store.startVertexId) return false;
+
+      if (algorithm === "shortest-path" && !store.endVertexId) {
+        return false;
+      }
+
+      return true;
+    },
+    [store.startVertexId, store.endVertexId]
+  );
+
   const canGoNext = store.step < store.steps.length - 1;
   const canGoPrev = store.step > 0;
   const totalSteps = store.steps.length;
 
   return {
+    // Состояние
     isRunning: store.isRunning,
     step: store.step,
     steps: store.steps,
     currentStep: store.currentStep,
     startVertexId: store.startVertexId,
+    endVertexId: store.endVertexId,
     currentAlgorithm: store.currentAlgorithm,
     speed: speeds[store.speed],
     speedIndex: store.speed,
+    isSelectingStartVertex: store.isSelectingStartVertex,
+    isSelectingEndVertex: store.isSelectingEndVertex,
+
+    // Флаги доступности
     canGoNext,
     canGoPrev,
     totalSteps,
+
+    // Функции подготовки и управления
     prepareAlgorithm,
+    startAlgorithm,
     startVisualization: store.startVisualization,
     stopVisualization: store.stopVisualization,
     pauseVisualization: store.pauseVisualization,
     nextStep: store.nextStep,
     prevStep: store.prevStep,
     resetVisualization: store.resetVisualization,
-    handlePlayPause,
-    handleSpeedChange,
     setStep: store.setStep,
     setAlgorithm: store.setAlgorithm,
+
+    // Управление выбором вершин
+    setStartVertex,
+    setEndVertex,
+    startSelectingStartVertex,
+    startSelectingEndVertex,
+    cancelVertexSelection,
+    isAlgorithmReady,
+
+    // UI контролы
+    handlePlayPause,
+    handleSpeedChange,
   };
 };

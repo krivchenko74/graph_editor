@@ -11,16 +11,25 @@ interface IVisualizationStore {
   steps: AlgorithmStep[];
   currentStep: AlgorithmStep | null;
   startVertexId: string | null;
+  endVertexId: string | null;
   currentAlgorithm: AlgorithmType | null;
   speed: number;
+  isSelectingStartVertex: boolean;
+  isSelectingEndVertex: boolean;
 
   // Действия
   prepareAlgorithm: (
     algorithm: AlgorithmType,
     startVertexId: string,
+    endVertexId: string | null,
     vertices: TVertex[],
     edges: TEdge[]
   ) => void;
+  setStartVertex: (vertexId: string | null) => void;
+  setEndVertex: (vertexId: string | null) => void;
+  startSelectingStartVertex: () => void;
+  startSelectingEndVertex: () => void;
+  cancelVertexSelection: () => void;
   startVisualization: () => void;
   stopVisualization: () => void;
   pauseVisualization: () => void;
@@ -38,12 +47,16 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
   steps: [],
   currentStep: null,
   startVertexId: null,
+  endVertexId: null,
   currentAlgorithm: null,
-  speed: 5, // Индекс по умолчанию для скорости 200ms
+  speed: 2,
+  isSelectingStartVertex: false,
+  isSelectingEndVertex: false,
 
   prepareAlgorithm: (
     algorithm: AlgorithmType,
     startVertexId: string,
+    endVertexId: string | null,
     vertices: TVertex[],
     edges: TEdge[]
   ) => {
@@ -52,14 +65,6 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
       console.error(`Algorithm ${algorithm} not found`);
       return;
     }
-
-    // Сбрасываем состояние перед подготовкой нового алгоритма
-    set({
-      isRunning: false,
-      step: 0,
-      steps: [],
-      currentStep: null,
-    });
 
     // Проверяем требования алгоритма
     if (algo.requirements) {
@@ -71,24 +76,59 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
         alert(`Алгоритм ${algo.name} требует взвешенные ребра`);
         return;
       }
+      if (algo.requirements.endVertex && !endVertexId) {
+        alert(`Алгоритм ${algo.name} требует выбор конечной вершины`);
+        return;
+      }
     }
 
     // Генерируем шаги алгоритма
-    const steps = algo.start(startVertexId, vertices, edges);
-
-    if (steps.length === 0) {
-      console.error("Algorithm generated no steps");
-      return;
-    }
-
-    console.log(`Generated ${steps.length} steps for algorithm`, algorithm);
+    const steps = algo.start(startVertexId, endVertexId, vertices, edges);
 
     set({
       steps,
       currentStep: steps[0],
       startVertexId,
+      endVertexId,
       currentAlgorithm: algorithm,
       step: 0,
+      isSelectingStartVertex: false,
+      isSelectingEndVertex: false,
+    });
+  },
+
+  setStartVertex: (vertexId: string | null) => {
+    set({
+      startVertexId: vertexId,
+      isSelectingStartVertex: false,
+    });
+  },
+
+  setEndVertex: (vertexId: string | null) => {
+    set({
+      endVertexId: vertexId,
+      isSelectingEndVertex: false,
+    });
+  },
+
+  startSelectingStartVertex: () => {
+    set({
+      isSelectingStartVertex: true,
+      isSelectingEndVertex: false,
+    });
+  },
+
+  startSelectingEndVertex: () => {
+    set({
+      isSelectingEndVertex: true,
+      isSelectingStartVertex: false,
+    });
+  },
+
+  cancelVertexSelection: () => {
+    set({
+      isSelectingStartVertex: false,
+      isSelectingEndVertex: false,
     });
   },
 
@@ -117,16 +157,12 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
 
     if (step < steps.length - 1) {
       const newStep = step + 1;
-
-      // Синхронное обновление состояния
       set({
         step: newStep,
         currentStep: steps[newStep],
       });
-
       return true;
     } else {
-      // Достигнут конец - останавливаем воспроизведение
       set({
         isRunning: false,
         currentStep: steps[steps.length - 1],
@@ -144,7 +180,7 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
       set({
         step: newStep,
         currentStep: steps[newStep],
-        isRunning: false, // Пауза при переходе назад
+        isRunning: false,
       });
     }
   },
@@ -156,12 +192,14 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
       steps: [],
       currentStep: null,
       startVertexId: null,
+      endVertexId: null,
       currentAlgorithm: null,
+      isSelectingStartVertex: false,
+      isSelectingEndVertex: false,
     });
   },
 
   setSpeed: (speed: number) => {
-    // Ограничиваем скорость в допустимых пределах
     const clampedSpeed = Math.max(0, Math.min(10, speed));
     set({ speed: clampedSpeed });
   },
@@ -172,13 +210,17 @@ const useVisualizationStore = create<IVisualizationStore>((set, get) => ({
       set({
         step,
         currentStep: steps[step],
-        isRunning: false, // Пауза при ручном переходе
+        isRunning: false,
       });
     }
   },
 
   setAlgorithm: (algorithm: AlgorithmType | null) => {
-    set({ currentAlgorithm: algorithm });
+    set({
+      currentAlgorithm: algorithm,
+      isSelectingStartVertex: false,
+      isSelectingEndVertex: false,
+    });
   },
 }));
 
