@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlgorithmStep } from "@/types/algorithm";
+import { AlgorithmStep, AlgorithmType } from "@/types/algorithm";
 import styles from "./Logs.module.css";
 import { useGraphStore } from "@/stores/graph-store";
 import { ChevronDown } from "lucide-react";
@@ -20,6 +20,7 @@ const Logs: React.FC<AlgorithmLogProps> = ({
   const currentStep = steps[currentStepIndex];
   const { graph } = useGraphStore();
   const vertices = graph.vertices;
+  const edges = graph.edges;
   const isRunning = useVisualization().totalSteps != 0;
 
   const toggleCollapse = () => {
@@ -30,49 +31,150 @@ const Logs: React.FC<AlgorithmLogProps> = ({
     return vertices.find((v) => v.id === vertexId)?.text || vertexId;
   };
 
-  // Автоматическое определение типа алгоритма на основе структуры данных
-  const detectAlgorithmType = (): "dfs" | "bfs" => {
-    // Проверяем первый шаг, где есть структура данных
-    const stepWithData = steps.find((step) => step.stack || step.queue);
+  const getEdgeText = (edgeId: string): string => {
+    const edge = edges.find((e) => e.id === edgeId);
+    if (!edge) return edgeId;
+    return `${getVertexText(edge.source)}-${getVertexText(edge.target)} (${
+      edge.weight
+    })`;
+  };
+
+  // Автоматическое определение типа алгоритма
+  const detectAlgorithmType = (): AlgorithmType => {
+    const stepWithData = steps.find(
+      (step) => step.stack || step.queue || step.priorityQueue
+    );
+
+    if (stepWithData?.priorityQueue !== undefined) {
+      return "mst"; // Для Прима используем priorityQueue
+    }
     if (stepWithData?.queue !== undefined) {
       return "bfs";
     }
-    return "dfs"; // по умолчанию
+    return "dfs";
   };
 
   const algorithmType = detectAlgorithmType();
 
-  // Функция для получения структуры данных в зависимости от алгоритма
+  // Функция для получения структуры данных
   const getDataStructure = (step: AlgorithmStep) => {
-    if (algorithmType === "bfs") {
-      return {
-        data: step.queue || [],
-        label: "Очередь",
-        className: styles.queueValue,
-      };
-    } else {
-      return {
-        data: step.stack || [],
-        label: "Стек",
-        className: styles.stackValue,
-      };
+    switch (algorithmType) {
+      case "bfs":
+        return {
+          data: step.queue || [],
+          label: "Очередь",
+          className: styles.queueValue,
+          formatItem: getVertexText,
+        };
+      case "mst":
+        return {
+          data: step.visitedEdges || [],
+          label: "Рёбра MST",
+          className: styles.mstValue,
+          formatItem: getEdgeText,
+        };
+      default:
+        return {
+          data: step.stack || [],
+          label: "Стек",
+          className: styles.stackValue,
+          formatItem: getVertexText,
+        };
     }
   };
 
   // Функция для получения размера структуры данных
   const getDataStructureSize = (step: AlgorithmStep) => {
-    if (algorithmType === "bfs") {
-      return step.queue?.length || 0;
-    } else {
-      return step.stack?.length || 0;
+    switch (algorithmType) {
+      case "bfs":
+        return step.queue?.length || 0;
+      case "mst":
+        return step.visitedEdges?.length || 0;
+      default:
+        return step.stack?.length || 0;
     }
   };
 
   // Функция для получения названия алгоритма
   const getAlgorithmName = () => {
-    return algorithmType === "bfs"
-      ? "BFS (поиск в ширину)"
-      : "DFS (поиск в глубину)";
+    switch (algorithmType) {
+      case "bfs":
+        return "BFS (поиск в ширину)";
+      case "mst":
+        return "Алгоритм Прима (MST)";
+      default:
+        return "DFS (поиск в глубину)";
+    }
+  };
+
+  // Получение веса MST из metadata
+  const getMSTTotalWeight = (step: AlgorithmStep): number => {
+    return step.metadata?.mstTotalWeight || 0;
+  };
+
+  // Функция для отображения статистики в зависимости от алгоритма
+  const renderStatistics = () => {
+    const commonStats = (
+      <>
+        <div className={styles.statItem}>
+          <span className={styles.statLabel}>Посещено вершин:</span>
+          <span className={styles.statValue}>
+            {currentStep.visitedVertices?.length || 0}
+          </span>
+        </div>
+        <div className={styles.statItem}>
+          <span className={styles.statLabel}>Пройдено рёбер:</span>
+          <span className={styles.statValue}>
+            {currentStep.visitedEdges?.length || 0}
+          </span>
+        </div>
+      </>
+    );
+
+    switch (algorithmType) {
+      case "bfs":
+        return (
+          <>
+            {commonStats}
+            <div className={styles.statItem}>
+              <span className={styles.statLabel}>Размер очереди:</span>
+              <span className={styles.statValue}>
+                {getDataStructureSize(currentStep)}
+              </span>
+            </div>
+          </>
+        );
+      case "mst":
+        return (
+          <>
+            {commonStats}
+            <div className={styles.statItem}>
+              <span className={styles.statLabel}>Рёбер в MST:</span>
+              <span className={styles.statValue}>
+                {getDataStructureSize(currentStep)}
+              </span>
+            </div>
+            <div className={styles.statItem}>
+              <span className={styles.statLabel}>Общий вес:</span>
+              <span className={styles.statValue}>
+                {getMSTTotalWeight(currentStep)}
+              </span>
+            </div>
+          </>
+        );
+      default:
+        return (
+          <>
+            {commonStats}
+            <div className={styles.statItem}>
+              <span className={styles.statLabel}>Размер стека:</span>
+              <span className={styles.statValue}>
+                {getDataStructureSize(currentStep)}
+              </span>
+            </div>
+          </>
+        );
+    }
   };
 
   return (
@@ -147,7 +249,7 @@ const Logs: React.FC<AlgorithmLogProps> = ({
                             <span className={dataStructure.className}>
                               [
                               {dataStructure.data
-                                .map((id) => getVertexText(id))
+                                .map((id) => dataStructure.formatItem(id))
                                 .join(", ")}
                               ]
                             </span>
@@ -178,6 +280,18 @@ const Logs: React.FC<AlgorithmLogProps> = ({
                               </span>
                             </div>
                           )}
+
+                        {algorithmType === "mst" &&
+                          getMSTTotalWeight(step) > 0 && (
+                            <div className={styles.detailItem}>
+                              <span className={styles.detailLabel}>
+                                Текущий вес MST:
+                              </span>
+                              <span className={styles.weightValue}>
+                                {getMSTTotalWeight(step)}
+                              </span>
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
@@ -190,30 +304,7 @@ const Logs: React.FC<AlgorithmLogProps> = ({
           {currentStep && (
             <div className={styles.statistics}>
               <div className={styles.statisticsLabel}>Статистика:</div>
-              <div className={styles.statsGrid}>
-                <div className={styles.statItem}>
-                  <span className={styles.statLabel}>Посещено вершин:</span>
-                  <span className={styles.statValue}>
-                    {currentStep.visitedVertices?.length || 0}
-                  </span>
-                </div>
-                <div className={styles.statItem}>
-                  <span className={styles.statLabel}>Пройдено рёбер:</span>
-                  <span className={styles.statValue}>
-                    {currentStep.visitedEdges?.length || 0}
-                  </span>
-                </div>
-                <div className={styles.statItem}>
-                  <span className={styles.statLabel}>
-                    {algorithmType === "bfs"
-                      ? "Размер очереди:"
-                      : "Размер стека:"}
-                  </span>
-                  <span className={styles.statValue}>
-                    {getDataStructureSize(currentStep)}
-                  </span>
-                </div>
-              </div>
+              <div className={styles.statsGrid}>{renderStatistics()}</div>
             </div>
           )}
         </div>

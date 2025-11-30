@@ -6,7 +6,7 @@ export type AlgorithmType =
   | "dijkstra"
   | "bellman-ford"
   | "ford-fulkerson"
-  | "prim"
+  | "mst"
   | "kruskal";
 
 // Универсальный шаг для ВСЕХ алгоритмов

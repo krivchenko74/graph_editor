@@ -27,7 +27,6 @@ export default function Header() {
       const startVertex = graph.vertices[0];
       if (startVertex) {
         prepareAlgorithm(
-          // Используем prepareAlgorithm вместо setAlgorithm
           algorithmType as any,
           startVertex.id,
           graph.vertices,
@@ -38,7 +37,31 @@ export default function Header() {
       const startVertex = graph.vertices[0];
       if (startVertex) {
         prepareAlgorithm(
-          // Используем prepareAlgorithm вместо setAlgorithm
+          algorithmType as any,
+          startVertex.id,
+          graph.vertices,
+          graph.edges
+        );
+      }
+    } else if (algorithmType === "mst") {
+      // Проверяем, что граф неориентированный и взвешенный для MST
+      const hasDirectedEdges = graph.edges.some((edge) => edge.directed);
+      if (hasDirectedEdges) {
+        alert("Алгоритм Прима работает только с неориентированными графами");
+        return;
+      }
+
+      const hasUnweightedEdges = graph.edges.some(
+        (edge) => edge.weight === undefined || edge.weight === null
+      );
+      if (hasUnweightedEdges) {
+        alert("Алгоритм Прима требует задания весов для всех рёбер");
+        return;
+      }
+
+      const startVertex = graph.vertices[0];
+      if (startVertex) {
+        prepareAlgorithm(
           algorithmType as any,
           startVertex.id,
           graph.vertices,
