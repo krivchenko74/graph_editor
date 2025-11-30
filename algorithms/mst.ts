@@ -4,7 +4,7 @@ import { TVertex, TEdge } from "@/types/graph";
 import { createInitialStep, createStep } from "@/utils/algorithm-utils";
 
 export const mstAlgorithm: Algorithm = {
-  name: "Алгоритм Прима",
+  name: "Минимальное остовное дерево (Прим)",
   type: "mst",
   description: "Построение минимального остовного дерева",
 

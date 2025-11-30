@@ -24,6 +24,7 @@ export default function GraphEditor() {
     null
   );
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [draggingVertexId, setDraggingVertexId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -57,8 +58,14 @@ export default function GraphEditor() {
       return;
 
     const rect = containerRef.current.getBoundingClientRect();
-    const worldX = (e.clientX - rect.left - offset.x) / zoom;
-    const worldY = (e.clientY - rect.top - offset.y) / zoom;
+
+    // Получаем позицию курсора относительно контейнера
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+
+    // Преобразуем в мировые координаты с учетом zoom и offset
+    const worldX = (clientX - offset.x) / zoom;
+    const worldY = (clientY - offset.y) / zoom;
 
     const newVertex: TVertex = {
       id: Date.now().toString(),
@@ -79,7 +86,6 @@ export default function GraphEditor() {
 
     // Alt+клик - выбор стартовой/конечной вершины
     if (isAltPressed) {
-      console.log("pressed");
       // Если уже выбрана как стартовая - снимаем выбор
       if (id === startVertexId) {
         setStartVertex(null);
@@ -99,7 +105,6 @@ export default function GraphEditor() {
       }
       return;
     }
-    console.log(startVertexId, endVertexId);
 
     // Обычный клик - существующая логика создания рёбер
     if (!edgeStartVertexId) {
@@ -124,6 +129,43 @@ export default function GraphEditor() {
     setEdgeStartVertexId(null);
   };
 
+  // ==== VERTEX DRAG HANDLERS ====
+  const handleVertexDragStart = (
+    id: string,
+    clientX: number,
+    clientY: number
+  ) => {
+    setDraggingVertexId(id);
+    setIsDragging(true);
+    setDragStart({ x: clientX - offset.x, y: clientY - offset.y });
+  };
+
+  const handleVertexDrag = (clientX: number, clientY: number) => {
+    if (!draggingVertexId || !isDragging) return;
+
+    // Вычисляем смещение в мировых координатах
+    const deltaX = (clientX - offset.x - dragStart.x) / zoom;
+    const deltaY = (clientY - offset.y - dragStart.y) / zoom;
+
+    // Получаем текущую позицию вершины
+    const vertex = graph.vertices.find((v) => v.id === draggingVertexId);
+    if (!vertex) return;
+
+    // Обновляем позицию
+    const newX = vertex.x + deltaX;
+    const newY = vertex.y + deltaY;
+
+    updateVertex(draggingVertexId, { x: newX, y: newY });
+
+    // Обновляем начальную позицию для следующего движения
+    setDragStart({ x: clientX - offset.x, y: clientY - offset.y });
+  };
+
+  const handleVertexDragEnd = () => {
+    setDraggingVertexId(null);
+    setIsDragging(false);
+  };
+
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (
       e.target === containerRef.current ||
@@ -139,6 +181,31 @@ export default function GraphEditor() {
       }
     }
   };
+
+  // ==== GLOBAL MOUSE HANDLERS FOR DRAGGING ====
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (isDragging && draggingVertexId) {
+        handleVertexDrag(e.clientX, e.clientY);
+      }
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        handleVertexDragEnd();
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener("mousemove", handleGlobalMouseMove);
+      document.addEventListener("mouseup", handleGlobalMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleGlobalMouseMove);
+      document.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [isDragging, draggingVertexId, zoom, offset, graph.vertices]);
 
   // ==== ZOOM (cursor-centered) ====
   const clampView = (newZoom: number, newOffset: { x: number; y: number }) => {
@@ -196,18 +263,22 @@ export default function GraphEditor() {
   // ==== PAN ====
   const handleMouseDown = (e: React.MouseEvent) => {
     const shouldPan = e.button === 1 || (e.button === 0 && e.shiftKey);
-    if (!shouldPan) return;
+    if (!shouldPan || draggingVertexId) return;
 
     setIsDragging(true);
     setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
+    if (!isDragging || draggingVertexId) return;
     setOffset({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
   };
 
-  const handleMouseUp = () => setIsDragging(false);
+  const handleMouseUp = () => {
+    if (!draggingVertexId) {
+      setIsDragging(false);
+    }
+  };
 
   // ==== SHIFT ====
   useEffect(() => {
@@ -255,10 +326,15 @@ export default function GraphEditor() {
     return null;
   };
 
+  // Создаем объект с вершинами для быстрого доступа
+  const verticesMap = Object.fromEntries(
+    graph.vertices.map((v: TVertex) => [v.id, v])
+  );
+
   return (
     <div
       ref={containerRef}
-      className={styles.container}
+      className={styles.container + " " + styles.canvas}
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -267,7 +343,13 @@ export default function GraphEditor() {
       onClick={handleCanvasClick}
       onDoubleClick={handleCanvasDoubleClick}
       style={{
-        cursor: isDragging ? "grabbing" : isShiftPressed ? "grab" : "default",
+        cursor: isDragging
+          ? draggingVertexId
+            ? "grabbing"
+            : "grabbing"
+          : isShiftPressed
+          ? "grab"
+          : "default",
       }}
     >
       {/* Индикатор выбора вершин */}
@@ -283,60 +365,20 @@ export default function GraphEditor() {
         </div>
       )}
 
-      {/* === HTML VERTEX LAYER === */}
-      <div
-        className={styles.canvas}
-        style={{
-          position: "absolute",
-          width: CANVAS_SIZE,
-          height: CANVAS_SIZE,
-          pointerEvents: "none",
-        }}
-      >
-        {graph.vertices.map((v: TVertex) => {
-          const screenX = offset.x + v.x * zoom;
-          const screenY = offset.y + v.y * zoom;
-          const animationColor = getVertexColor(
-            v.id,
-            currentStep,
-            edgeStartVertexId
-          );
-
-          return (
-            <div
-              key={v.id}
-              style={{ pointerEvents: isRunning ? "none" : "all" }}
-            >
-              <Vertex
-                vertex={{ ...v, x: screenX, y: screenY }}
-                zoom={zoom}
-                offset={offset}
-                isSelected={edgeStartVertexId === v.id}
-                onClick={(id, event) => handleVertexClick(id, event)}
-                onUpdate={handleVertexUpdate}
-                onDelete={handleVertexDelete}
-                isStartVertex={startVertexId == v.id}
-                isEndVertex={endVertexId == v.id}
-                animationColor={animationColor}
-              />
-            </div>
-          );
-        })}
-      </div>
-
-      {/* === SVG EDGE LAYER === */}
+      {/* === ЕДИНЫЙ SVG LAYER (вершины + рёбра) === */}
       <svg
-        className={styles.edgesLayer}
+        className={styles.svgLayer}
         style={{
           position: "absolute",
           inset: 0,
           width: "100%",
           height: "100%",
-          pointerEvents: "none",
+          pointerEvents: isDragging && draggingVertexId ? "none" : "none",
           overflow: "visible",
         }}
         viewBox={viewBox}
       >
+        {/* Рёбра */}
         {graph.edges.map((e: TEdge) => {
           const animationColor = getEdgeColor(
             e.id,
@@ -348,9 +390,7 @@ export default function GraphEditor() {
             <Edge
               key={e.id}
               edge={e}
-              vertices={Object.fromEntries(
-                graph.vertices.map((v: TVertex) => [v.id, v])
-              )}
+              vertices={verticesMap}
               zoom={zoom}
               onUpdate={handleEdgeUpdate}
               onSelect={setSelectedEdgeId}
@@ -358,6 +398,47 @@ export default function GraphEditor() {
               isSelected={e.id === selectedEdgeId}
               animationColor={animationColor}
             />
+          );
+        })}
+
+        {/* Вершины как foreignObject */}
+        {graph.vertices.map((v: TVertex) => {
+          const animationColor = getVertexColor(
+            v.id,
+            currentStep,
+            edgeStartVertexId
+          );
+
+          return (
+            <g key={v.id} transform={`translate(${v.x}, ${v.y})`}>
+              <foreignObject
+                x={-20}
+                y={-20}
+                width={40}
+                height={40}
+                style={{
+                  pointerEvents: isRunning ? "none" : "all",
+                  overflow: "visible",
+                }}
+              >
+                <Vertex
+                  vertex={v}
+                  onUpdate={handleVertexUpdate}
+                  onDelete={handleVertexDelete}
+                  onClick={handleVertexClick}
+                  onDragStart={handleVertexDragStart}
+                  onDrag={handleVertexDrag}
+                  onDragEnd={handleVertexDragEnd}
+                  isSelected={edgeStartVertexId === v.id}
+                  isStartVertex={startVertexId === v.id}
+                  isEndVertex={endVertexId === v.id}
+                  animationColor={animationColor}
+                  currentStep={currentStep}
+                  zoom={zoom}
+                  isDragging={draggingVertexId === v.id}
+                />
+              </foreignObject>
+            </g>
           );
         })}
       </svg>

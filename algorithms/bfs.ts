@@ -4,7 +4,7 @@ import { TVertex, TEdge } from "@/types/graph";
 import { createInitialStep, createStep } from "@/utils/algorithm-utils";
 
 export const bfsAlgorithm: Algorithm = {
-  name: "Обход в ширину",
+  name: "Обход в ширину (BFS)",
   type: "bfs",
   description: "Поиск в ширину с использованием очереди",
 

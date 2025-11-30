@@ -4,7 +4,7 @@ import { TVertex, TEdge } from "@/types/graph";
 import { createInitialStep, createStep } from "@/utils/algorithm-utils";
 
 export const dfsAlgorithm: Algorithm = {
-  name: "Обход в глубину",
+  name: "Обход в глубину (DFS)",
   type: "dfs",
   description: "Поиск в глубину с использованием стека",
 

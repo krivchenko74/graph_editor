@@ -1,15 +1,15 @@
 // StepManager.tsx - с нормализованными скоростями
 "use client";
 import styles from "./StepManager.module.css";
+import { BsX } from "react-icons/bs";
 import {
-  BsChevronDoubleRight,
-  BsChevronDoubleLeft,
-  BsFastForward,
-  BsCaretRight,
-  BsPlay,
-  BsPause,
-  BsX,
-} from "react-icons/bs";
+  Play,
+  ChevronsRight,
+  Rewind,
+  StepBack,
+  StepForward,
+  Pause,
+} from "lucide-react";
 import { useVisualization } from "@/hooks/useVisualization";
 
 // Функция для форматирования скорости в понятный вид
@@ -67,7 +67,7 @@ export default function StepManager() {
             disabled={step === 0 || totalSteps === 0}
             title="В начало"
           >
-            <BsFastForward size={20} className={styles.turn} />
+            <Rewind style={{ marginLeft: "-2px" }} size={20} />
           </button>
 
           <button
@@ -76,7 +76,7 @@ export default function StepManager() {
             disabled={!canGoPrev || totalSteps === 0}
             title="Предыдущий шаг"
           >
-            <BsCaretRight size={20} className={styles.turn} />
+            <StepBack style={{ marginLeft: "-3px" }} size={20} />
           </button>
 
           <button
@@ -86,11 +86,7 @@ export default function StepManager() {
             disabled={totalSteps === 0}
             title={isRunning ? "Пауза" : "Воспроизведение"}
           >
-            {isRunning ? (
-              <BsPause size={20} />
-            ) : (
-              <BsPlay style={{ marginLeft: 2 }} size={20} />
-            )}
+            {isRunning ? <Pause size={16} /> : <Play size={16} />}
           </button>
 
           <button
@@ -99,7 +95,7 @@ export default function StepManager() {
             disabled={!canGoNext || totalSteps === 0}
             title="Следующий шаг"
           >
-            <BsCaretRight size={20} />
+            <StepForward style={{ marginLeft: "3px" }} size={20} />
           </button>
 
           <button
@@ -108,7 +104,11 @@ export default function StepManager() {
             disabled={step === totalSteps - 1 || totalSteps === 0}
             title="В конец"
           >
-            <BsFastForward size={20} />
+            <Rewind
+              style={{ marginLeft: "2px" }}
+              className={styles.turn}
+              size={20}
+            />
           </button>
         </div>
 
@@ -120,7 +120,7 @@ export default function StepManager() {
             disabled={speedIndex === 0 || totalSteps === 0}
             title="Уменьшить скорость"
           >
-            <BsChevronDoubleLeft size={20} />
+            <ChevronsRight style={{ transform: "rotate(180deg)" }} size={24} />
           </button>
 
           <span className={styles.text} title="Скорость воспроизведения">
@@ -133,7 +133,7 @@ export default function StepManager() {
             disabled={speedIndex === speeds.length - 1 || totalSteps === 0}
             title="Увеличить скорость"
           >
-            <BsChevronDoubleRight size={20} />
+            <ChevronsRight size={24} />
           </button>
         </div>
 

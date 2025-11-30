@@ -4,7 +4,7 @@ import { TVertex, TEdge } from "@/types/graph";
 import { createInitialStep, createStep } from "@/utils/algorithm-utils";
 
 export const shortestPathAlgorithm: Algorithm = {
-  name: "Алгоритм Дейкстры",
+  name: "Поиск кратчайшего пути (Дейкстра)",
   type: "shortest-path",
   description: "Поиск кратчайшего пути между двумя вершинами",
   requirements: {

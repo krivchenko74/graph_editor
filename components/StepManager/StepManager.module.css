@@ -74,3 +74,8 @@
 .resetButton:active {
   scale: 0.9;
 }
+.button svg {
+  display: flex;
+  align-self: center;
+  justify-self: center;
+}
