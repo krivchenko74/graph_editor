@@ -49,7 +49,7 @@ export default function Header() {
       );
     }
     // Для алгоритмов, требующих обе вершины
-    else if (algorithm === "shortest-path") {
+    else if (algorithm === "shortest-path" || algorithm === "max-flow") {
       if (!startVertexId) {
         startSelectingStartVertex();
         return;

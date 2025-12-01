@@ -1,8 +1,10 @@
+// Edge.tsx (обновлённая версия)
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { TEdge, TVertex } from "@/types/graph";
 import { EdgeColor } from "@/types/colors";
+import { AlgorithmStep } from "@/types/algorithm";
 
 type EdgeProps = {
   edge: TEdge;
@@ -14,7 +16,10 @@ type EdgeProps = {
   isSelected?: boolean;
   onSelect?: (id: string | null) => void;
   isHighlighted?: boolean;
-  animationColor?: EdgeColor; // Цвет для анимации
+  animationColor?: EdgeColor;
+  // Для алгоритма потока
+  currentStep?: AlgorithmStep;
+  stepIndex?: number;
 };
 
 export const Edge = ({
@@ -28,6 +33,8 @@ export const Edge = ({
   onSelect,
   isHighlighted,
   animationColor,
+  currentStep,
+  stepIndex = 0,
 }: EdgeProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditingWeight, setIsEditingWeight] = useState(false);
@@ -40,10 +47,44 @@ export const Edge = ({
   const target = vertices[edge.target];
   if (!source || !target) return null;
 
-  const x1 = source.x,
-    y1 = source.y;
-  const x2 = target.x,
-    y2 = target.y;
+  // Получаем данные о потоке из metadata
+  const getFlowData = (): any | null => {
+    if (!currentStep?.metadata) return null;
+
+    const { flows, residualFlows } = currentStep.metadata;
+
+    // Проверяем основные рёбра
+    if (flows && flows[edge.id]) {
+      return flows[edge.id];
+    }
+
+    // Проверяем остаточные рёбра
+    if (residualFlows && residualFlows[edge.id]) {
+      return residualFlows[edge.id];
+    }
+
+    return null;
+  };
+
+  const flowData = getFlowData();
+  const currentFlow = flowData?.flow || 0;
+  const residualCapacity = flowData?.residual || 0;
+  const isResidualEdge = flowData?.isResidual || false;
+  const showFlowInfo = currentFlow > 0 || isResidualEdge;
+
+  // Проверяем, является ли ребро частью текущего увеличивающего пути
+  const isInPath = currentStep?.metadata?.augmentingPath
+    ? isEdgeInPath(edge, currentStep.metadata.augmentingPath)
+    : false;
+
+  // Для остаточного ребра меняем направление отображения
+  const effectiveSource = isResidualEdge ? target : source;
+  const effectiveTarget = isResidualEdge ? source : target;
+
+  const x1 = effectiveSource.x,
+    y1 = effectiveSource.y;
+  const x2 = effectiveTarget.x,
+    y2 = effectiveTarget.y;
 
   const vertexRadius = 20;
   const startOffset = vertexRadius;
@@ -62,23 +103,23 @@ export const Edge = ({
 
   const curvature = edge.curvature ?? 0;
 
-  // Вычисляем середину между смещенными точками
+  // Для остаточных рёбер немного смещаем кривизну, чтобы не накладывались
+  const effectiveCurvature = isResidualEdge
+    ? curvature === 0
+      ? 0.3
+      : Math.sign(curvature) * Math.min(Math.abs(curvature) + 0.3, 1)
+    : curvature;
+
   const midX = (startX + endX) / 2;
   const midY = (startY + endY) / 2;
 
-  // Перпендикулярный вектор
   const perpX = -uy,
     perpY = ux;
-
-  // Контрольная точка для кривой Безье - всегда на фиксированном расстоянии от середины
   const curveDistance = 80;
-  const controlX = midX + perpX * curveDistance * curvature;
-  const controlY = midY + perpY * curveDistance * curvature;
+  const controlX = midX + perpX * curveDistance * effectiveCurvature;
+  const controlY = midY + perpY * curveDistance * effectiveCurvature;
 
-  // Позиция для веса - на самой кривой, а не на прямой между вершинами
-  const weightPosT = 0.5; // Параметр t для позиции на кривой (0-1)
-
-  // Вычисляем точку на кривой Безье для веса
+  const weightPosT = 0.5;
   const t = weightPosT;
   const weightX =
     (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * controlX + t * t * endX;
@@ -86,18 +127,81 @@ export const Edge = ({
     (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * controlY + t * t * endY;
 
   const pathD = `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
-  const arrowId = `arrow-${edge.id}`;
+  const arrowId = `arrow-${edge.id}-${stepIndex}`;
 
   // Определяем цвет ребра
-  const edgeColor =
-    animationColor ||
-    (isHighlighted
-      ? EdgeColor.HIGHLIGHTED
-      : isSelected
-      ? EdgeColor.SELECTED
-      : EdgeColor.DEFAULT);
+  const getEdgeColor = (): EdgeColor => {
+    if (animationColor) return animationColor;
 
-  // === Обработка удаления по Backspace/Delete ===
+    if (isResidualEdge) {
+      // Остаточные рёбра - используем QUEUED (фиолетовый) или HIGHLIGHTED
+      return EdgeColor.HIGHLIGHTED;
+    }
+
+    if (isInPath) {
+      // Рёбра в текущем увеличивающем пути
+      return EdgeColor.PATH;
+    }
+
+    if (isHighlighted) {
+      return EdgeColor.HIGHLIGHTED;
+    }
+
+    if (isSelected) {
+      return EdgeColor.SELECTED;
+    }
+
+    // Для рёбер с потоком - чем больше поток, тем "горячее" цвет
+    if (currentFlow > 0 && !isResidualEdge) {
+      const capacity = edge.weight ?? 1;
+      const utilization = currentFlow / capacity;
+
+      if (utilization >= 0.9) return EdgeColor.SELECTED; // Почти красный
+      if (utilization >= 0.7) return EdgeColor.HIGHLIGHTED; // Оранжевый
+      if (utilization >= 0.3) return EdgeColor.VISITED; // Зелёный
+      return EdgeColor.PATH; // Голубой для малого потока
+    }
+
+    return EdgeColor.DEFAULT;
+  };
+
+  const edgeColor = getEdgeColor();
+
+  // Толщина ребра
+  const getStrokeWidth = (): number => {
+    if (isSelected) return 3.5;
+    if (isInPath) return 3;
+
+    if (currentFlow > 0 && !isResidualEdge) {
+      const capacity = edge.weight ?? 1;
+      const utilization = currentFlow / capacity;
+      return 2 + utilization * 1.2;
+    }
+
+    return isResidualEdge ? 2 : 2.5;
+  };
+
+  // Стиль линии
+  const getStrokeDasharray = (): string => {
+    return isResidualEdge ? "5,3" : "none";
+  };
+
+  // Функция для проверки, находится ли ребро в пути
+  function isEdgeInPath(edge: TEdge, path: string[]): boolean {
+    for (let i = 0; i < path.length - 1; i++) {
+      const u = path[i];
+      const v = path[i + 1];
+      if (
+        (edge.source === u && edge.target === v) ||
+        (edge.source === v && edge.target === u)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // === Обработка удаления ===
   useEffect(() => {
     if (!isSelected) return;
 
@@ -120,12 +224,10 @@ export const Edge = ({
     const handleGlobalMouseMove = (e: MouseEvent) => {
       if (!startPos.current) return;
 
-      // Вычисляем вектор от середины ребра к текущей позиции мыши
       const deltaY = (startPos.current.y - e.clientY) / zoom;
       const newCurvature = startPos.current.curvature + deltaY * 0.0035;
-
-      // Ограничиваем изгиб
       const clampedCurvature = Math.max(-1, Math.min(1, newCurvature));
+
       onUpdate(edge.id, { curvature: clampedCurvature });
     };
 
@@ -143,11 +245,9 @@ export const Edge = ({
     };
   }, [isDragging, zoom, edge.id, onUpdate]);
 
-  // === Перетаскивание изгиба по ребру ===
+  // === Перетаскивание изгиба ===
   const handleEdgeMouseDown = (e: React.MouseEvent) => {
-    // Клик на вес - не начинаем перетаскивание
     if ((e.target as HTMLElement).closest("foreignObject")) return;
-
     e.stopPropagation();
     e.preventDefault();
     setIsDragging(true);
@@ -159,11 +259,9 @@ export const Edge = ({
     onSelect?.(edge.id);
   };
 
-  // === Клик на ребро (выделение) ===
+  // === Клик на ребро ===
   const handleEdgeClick = (e: React.MouseEvent) => {
-    // Клик на вес - не выделяем ребро
     if ((e.target as HTMLElement).closest("foreignObject")) return;
-
     e.stopPropagation();
     onSelect?.(edge.id);
   };
@@ -180,8 +278,6 @@ export const Edge = ({
     onUpdate(edge.id, { weight: Math.max(1, value) });
   };
 
-  const handleWeightBlur = () => setIsEditingWeight(false);
-
   const handleWeightKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       inputRef.current?.blur();
@@ -190,14 +286,59 @@ export const Edge = ({
     }
   };
 
-  const handleInputBlur = () => {
-    setIsEditingWeight(false);
+  // Текст для отображения на ребре
+  const getEdgeText = (): string => {
+    if (showFlowInfo && !isResidualEdge) {
+      const capacity = edge.weight ?? 1;
+      return `${currentFlow}/${capacity}`;
+    }
+
+    if (isResidualEdge && residualCapacity > 0) {
+      return `r:${residualCapacity}`;
+    }
+
+    return `${edge.weight ?? 1}`;
+  };
+
+  // Фон для метки
+  const getLabelBackground = (): string => {
+    if (isSelected) return "#fee2e2";
+    if (isResidualEdge) return "#faf5ff";
+    if (isInPath) return "#f0f9ff";
+    if (isHighlighted) return "#fffbeb";
+    return "white";
+  };
+
+  // Цвет текста
+  const getLabelTextColor = (): string => {
+    if (isSelected) return "#dc2626";
+    if (isResidualEdge) return "#7c3aed";
+    if (isInPath) return "#0284c7";
+    if (isHighlighted) return "#f59e0b";
+    if (currentFlow > 0 && !isResidualEdge) {
+      const capacity = edge.weight ?? 1;
+      const utilization = currentFlow / capacity;
+      if (utilization >= 0.9) return "#dc2626";
+      if (utilization >= 0.7) return "#f59e0b";
+      if (utilization >= 0.3) return "#10b981";
+      return "#06b6d4";
+    }
+    return "#374151";
+  };
+
+  // Граница метки
+  const getLabelBorderColor = (): string => {
+    if (isSelected) return "#dc2626";
+    if (isResidualEdge) return "#7c3aed";
+    if (isInPath) return "#0284c7";
+    if (isHighlighted) return "#f59e0b";
+    return "#e2e8f0";
   };
 
   return (
     <>
       {/* Стрелка */}
-      {edge.directed && (
+      {(edge.directed || isResidualEdge) && (
         <defs>
           <marker
             id={arrowId}
@@ -207,45 +348,36 @@ export const Edge = ({
             refY="3"
             orient="auto"
           >
-            <path
-              d="M0,0 L0,6 L6,3 z"
-              fill={
-                edgeColor === EdgeColor.SELECTED
-                  ? "#ef4444"
-                  : edgeColor === EdgeColor.HIGHLIGHTED
-                  ? "#f97316"
-                  : edgeColor === EdgeColor.VISITED
-                  ? "#22c55e"
-                  : edgeColor === EdgeColor.PATH
-                  ? "#0ea5e9"
-                  : "#64748b"
-              }
-            />
+            <path d="M0,0 L0,6 L6,3 z" fill={edgeColor} />
           </marker>
         </defs>
       )}
 
-      {/* Основное ребро - теперь с pointerEvents для обработки анимации */}
+      {/* Основное ребро */}
       <path
         d={pathD}
         fill="none"
         stroke={edgeColor}
-        strokeWidth={isSelected ? "3.5" : "2.5"}
-        markerEnd={edge.directed ? `url(#${arrowId})` : undefined}
-        pointerEvents="stroke" // ← ИЗМЕНЕНИЕ: теперь обрабатывает события
+        strokeWidth={getStrokeWidth()}
+        strokeDasharray={getStrokeDasharray()}
+        markerEnd={
+          edge.directed || isResidualEdge ? `url(#${arrowId})` : undefined
+        }
+        pointerEvents="stroke"
         cursor={isDragging ? "ns-resize" : "pointer"}
         onClick={handleEdgeClick}
         onMouseDown={handleEdgeMouseDown}
         style={{
-          transition: isDragging ? "none" : "cursor 0.2s ease",
+          transition: isDragging ? "none" : "all 0.3s ease",
+          opacity: isResidualEdge ? 0.7 : 1,
         }}
       />
 
-      {/* Вес ребра - позиционируется на кривой */}
+      {/* Метка с весом/потоком */}
       <foreignObject
-        x={weightX - 30}
+        x={weightX - 35}
         y={weightY - 25}
-        width="60"
+        width="70"
         height="40"
         pointerEvents="all"
         onClick={onWeightClick}
@@ -265,18 +397,17 @@ export const Edge = ({
               min="1"
               defaultValue={edge.weight ?? 1}
               onChange={handleWeightChange}
-              onBlur={handleInputBlur}
+              onBlur={() => setIsEditingWeight(false)}
               onKeyDown={handleWeightKeyDown}
               style={{
-                width: "50px",
+                width: "60px",
                 textAlign: "center",
                 fontWeight: "600",
                 border: "2px solid #3b82f6",
                 borderRadius: "4px",
                 fontSize: "14px",
                 background: "white",
-                zIndex: 10,
-                position: "relative",
+                zIndex: 20,
               }}
               onClick={(e) => e.stopPropagation()}
             />
@@ -284,23 +415,22 @@ export const Edge = ({
             <div
               onDoubleClick={handleWeightDoubleClick}
               style={{
-                padding: "6px 8px",
-                background: "white",
-                border: `2px solid ${isSelected ? "#ef4444" : "#e2e8f0"}`,
+                padding: "4px 8px",
+                background: getLabelBackground(),
+                border: `2px solid ${getLabelBorderColor()}`,
                 borderRadius: "6px",
                 cursor: "text",
                 fontWeight: "600",
                 userSelect: "none",
                 fontSize: "14px",
                 boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                minWidth: "30px",
+                minWidth: "40px",
                 textAlign: "center",
-                color: isSelected ? "#ef4444" : "#374151",
-                zIndex: 10,
-                position: "relative",
+                color: getLabelTextColor(),
+                zIndex: 20,
               }}
             >
-              {edge.weight ?? 1}
+              {getEdgeText()}
             </div>
           )}
         </div>

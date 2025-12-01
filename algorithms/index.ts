@@ -3,6 +3,7 @@ import { Algorithm } from "@/types/algorithm";
 import { dfsAlgorithm } from "./dfs";
 import { bfsAlgorithm } from "./bfs";
 import { mstAlgorithm } from "./mst";
+import { fordFulkersonAlgorithm } from "./max-flow";
 import { shortestPathAlgorithm } from "./shortest-path";
 
 export const algorithms: Record<string, Algorithm> = {
@@ -10,6 +11,7 @@ export const algorithms: Record<string, Algorithm> = {
   bfs: bfsAlgorithm,
   mst: mstAlgorithm,
   "shortest-path": shortestPathAlgorithm,
+  "max-flow": fordFulkersonAlgorithm,
 };
 
 export const getAlgorithm = (type: string): Algorithm | null => {

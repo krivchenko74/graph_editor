@@ -397,6 +397,8 @@ export default function GraphEditor() {
               onDelete={deleteEdge}
               isSelected={e.id === selectedEdgeId}
               animationColor={animationColor}
+              currentStep={currentStep!}
+              stepIndex={steps.indexOf(currentStep!)}
             />
           );
         })}

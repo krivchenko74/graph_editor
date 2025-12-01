@@ -36,7 +36,12 @@ export interface AlgorithmStep {
 }
 
 // types/algorithm.ts
-export type AlgorithmType = "dfs" | "bfs" | "mst" | "shortest-path"; // добавить новый тип
+export type AlgorithmType =
+  | "dfs"
+  | "bfs"
+  | "mst"
+  | "shortest-path"
+  | "max-flow"; // добавить новый тип
 
 export interface AlgorithmRequirements {
   directed?: boolean;
