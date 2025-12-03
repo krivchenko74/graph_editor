@@ -1,4 +1,4 @@
-// Edge.tsx (обновлённая версия)
+// Edge.tsx - исправленная версия с правильной обработкой обратных рёбер
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -12,12 +12,10 @@ type EdgeProps = {
   zoom: number;
   onUpdate: (id: string, updates: Partial<TEdge>) => void;
   onDelete: (id: string) => void;
-  onWeightClick?: (e: React.MouseEvent) => void;
   isSelected?: boolean;
   onSelect?: (id: string | null) => void;
   isHighlighted?: boolean;
   animationColor?: EdgeColor;
-  // Для алгоритма потока
   currentStep?: AlgorithmStep;
   stepIndex?: number;
 };
@@ -28,7 +26,6 @@ export const Edge = ({
   zoom,
   onUpdate,
   onDelete,
-  onWeightClick,
   isSelected = false,
   onSelect,
   isHighlighted,
@@ -38,403 +35,478 @@ export const Edge = ({
 }: EdgeProps) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isEditingWeight, setIsEditingWeight] = useState(false);
+  const [tempWeight, setTempWeight] = useState(edge.weight.toString());
+
+  // Refs
+  const weightInputRef = useRef<HTMLInputElement>(null);
   const startPos = useRef<{ x: number; y: number; curvature: number } | null>(
     null
   );
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const source = vertices[edge.source];
   const target = vertices[edge.target];
   if (!source || !target) return null;
 
+  // Автофокус при редактировании
+  useEffect(() => {
+    if (isEditingWeight && weightInputRef.current) {
+      weightInputRef.current.focus();
+      weightInputRef.current.select();
+    }
+  }, [isEditingWeight]);
+
   // Получаем данные о потоке из metadata
-  const getFlowData = (): any | null => {
-    if (!currentStep?.metadata) return null;
-
-    const { flows, residualFlows } = currentStep.metadata;
-
-    // Проверяем основные рёбра
-    if (flows && flows[edge.id]) {
-      return flows[edge.id];
-    }
-
-    // Проверяем остаточные рёбра
-    if (residualFlows && residualFlows[edge.id]) {
-      return residualFlows[edge.id];
-    }
-
-    return null;
+  const getFlowData = () => {
+    if (!currentStep?.metadata?.flows) return null;
+    return currentStep.metadata.flows[edge.id] || null;
   };
 
   const flowData = getFlowData();
   const currentFlow = flowData?.flow || 0;
-  const residualCapacity = flowData?.residual || 0;
-  const isResidualEdge = flowData?.isResidual || false;
-  const showFlowInfo = currentFlow > 0 || isResidualEdge;
+  const capacity = flowData?.capacity || edge.weight || 1;
 
-  // Проверяем, является ли ребро частью текущего увеличивающего пути
-  const isInPath = currentStep?.metadata?.augmentingPath
-    ? isEdgeInPath(edge, currentStep.metadata.augmentingPath)
-    : false;
+  // ДЕБАГ: Выводим данные для проверки
+  console.log("Edge debug:", {
+    edgeId: edge.id,
+    currentStep: currentStep?.metadata?.stepDescription,
+    flows: currentStep?.metadata?.flows,
+    backwardEdgesToShow: currentStep?.metadata?.backwardEdgesToShow,
+    hasFlowData: !!flowData,
+    currentFlow,
+    capacity,
+  });
 
-  // Для остаточного ребра меняем направление отображения
-  const effectiveSource = isResidualEdge ? target : source;
-  const effectiveTarget = isResidualEdge ? source : target;
+  // Получаем массив обратных рёбер для отображения
+  const getBackwardEdgesToShow = (): string[] => {
+    if (!currentStep?.metadata?.backwardEdgesToShow) return [];
 
-  const x1 = effectiveSource.x,
-    y1 = effectiveSource.y;
-  const x2 = effectiveTarget.x,
-    y2 = effectiveTarget.y;
+    const backwardEdges = currentStep.metadata.backwardEdgesToShow;
 
-  const vertexRadius = 20;
-  const startOffset = vertexRadius;
-  const endOffset = edge.directed ? vertexRadius + 10 : vertexRadius;
-
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const length = Math.hypot(dx, dy) || 1;
-  const ux = dx / length,
-    uy = dy / length;
-
-  const startX = x1 + ux * startOffset;
-  const startY = y1 + uy * startOffset;
-  const endX = x2 - ux * endOffset;
-  const endY = y2 - uy * endOffset;
-
-  const curvature = edge.curvature ?? 0;
-
-  // Для остаточных рёбер немного смещаем кривизну, чтобы не накладывались
-  const effectiveCurvature = isResidualEdge
-    ? curvature === 0
-      ? 0.3
-      : Math.sign(curvature) * Math.min(Math.abs(curvature) + 0.3, 1)
-    : curvature;
-
-  const midX = (startX + endX) / 2;
-  const midY = (startY + endY) / 2;
-
-  const perpX = -uy,
-    perpY = ux;
-  const curveDistance = 80;
-  const controlX = midX + perpX * curveDistance * effectiveCurvature;
-  const controlY = midY + perpY * curveDistance * effectiveCurvature;
-
-  const weightPosT = 0.5;
-  const t = weightPosT;
-  const weightX =
-    (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * controlX + t * t * endX;
-  const weightY =
-    (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * controlY + t * t * endY;
-
-  const pathD = `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
-  const arrowId = `arrow-${edge.id}-${stepIndex}`;
-
-  // Определяем цвет ребра
-  const getEdgeColor = (): EdgeColor => {
-    if (animationColor) return animationColor;
-
-    if (isResidualEdge) {
-      // Остаточные рёбра - используем QUEUED (фиолетовый) или HIGHLIGHTED
-      return EdgeColor.HIGHLIGHTED;
+    // Если это строка (один ID)
+    if (typeof backwardEdges === "string") {
+      return [backwardEdges];
     }
 
-    if (isInPath) {
-      // Рёбра в текущем увеличивающем пути
-      return EdgeColor.PATH;
+    // Если это массив
+    if (Array.isArray(backwardEdges)) {
+      return backwardEdges;
     }
 
-    if (isHighlighted) {
-      return EdgeColor.HIGHLIGHTED;
+    return [];
+  };
+
+  const backwardEdgesToShow = getBackwardEdgesToShow();
+
+  // Показываем обратное ребро если:
+  // 1. Оно есть в backwardEdgesToShow
+  // 2. ИЛИ текущий поток > 0 (это означает, что есть обратное ребро в остаточной сети)
+  const shouldShowBackward =
+    backwardEdgesToShow.includes(edge.id) || currentFlow > 0;
+
+  console.log("Should show backward:", {
+    edgeId: edge.id,
+    inBackwardList: backwardEdgesToShow.includes(edge.id),
+    currentFlow,
+    shouldShowBackward,
+  });
+
+  // Определяем curvature для обратного ребра
+  const getBackwardCurvature = () => {
+    // Используем специальную curvature из metadata если есть
+    if (currentStep?.metadata?.edgeCurvatures) {
+      const curvatures = currentStep.metadata.edgeCurvatures as Record<
+        string,
+        number
+      >;
+      return curvatures[edge.id] || 0.7;
+    }
+    return 0.7; // значение по умолчанию
+  };
+
+  const getEdgeColor = (isBackward: boolean): string => {
+    if (animationColor) {
+      return typeof animationColor === "string" ? animationColor : "#000000";
     }
 
-    if (isSelected) {
-      return EdgeColor.SELECTED;
+    if (isBackward) {
+      return "#f59e0b"; // Оранжевый для обратных рёбер
     }
 
-    // Для рёбер с потоком - чем больше поток, тем "горячее" цвет
-    if (currentFlow > 0 && !isResidualEdge) {
-      const capacity = edge.weight ?? 1;
+    if (isSelected) return "#3b82f6";
+    if (isHighlighted) return "#f59e0b";
+
+    if (currentFlow > 0) {
       const utilization = currentFlow / capacity;
-
-      if (utilization >= 0.9) return EdgeColor.SELECTED; // Почти красный
-      if (utilization >= 0.7) return EdgeColor.HIGHLIGHTED; // Оранжевый
-      if (utilization >= 0.3) return EdgeColor.VISITED; // Зелёный
-      return EdgeColor.PATH; // Голубой для малого потока
+      if (utilization >= 0.9) return "#dc2626";
+      if (utilization >= 0.7) return "#f59e0b";
+      if (utilization >= 0.3) return "#10b981";
+      return "#059669";
     }
 
-    return EdgeColor.DEFAULT;
+    return "#374151";
   };
 
-  const edgeColor = getEdgeColor();
+  // Обработчик двойного клика по весу ребра
+  const handleWeightDoubleClick = (
+    e: React.MouseEvent,
+    isBackward: boolean
+  ) => {
+    if (isBackward) return; // Не редактируем вес для обратных рёбер
+    e.stopPropagation();
+    e.preventDefault();
+    setIsEditingWeight(true);
+    setTempWeight(edge.weight.toString());
+  };
 
-  // Толщина ребра
-  const getStrokeWidth = (): number => {
-    if (isSelected) return 3.5;
-    if (isInPath) return 3;
+  // Сохранение нового веса
+  const handleWeightSave = () => {
+    const weight = parseFloat(tempWeight);
+    if (!isNaN(weight) && weight > 0) {
+      onUpdate(edge.id, { weight });
+    }
+    setIsEditingWeight(false);
+  };
 
-    if (currentFlow > 0 && !isResidualEdge) {
-      const capacity = edge.weight ?? 1;
-      const utilization = currentFlow / capacity;
-      return 2 + utilization * 1.2;
+  // Отмена редактирования
+  const handleWeightCancel = () => {
+    setIsEditingWeight(false);
+    setTempWeight(edge.weight.toString());
+  };
+
+  const renderEdgePart = (isBackwardPart: boolean) => {
+    // ДЛЯ ОБРАТНОГО РЁБРА: отображаем только если shouldShowBackward = true
+    if (isBackwardPart && !shouldShowBackward) {
+      return null;
     }
 
-    return isResidualEdge ? 2 : 2.5;
-  };
-
-  // Стиль линии
-  const getStrokeDasharray = (): string => {
-    return isResidualEdge ? "5,3" : "none";
-  };
-
-  // Функция для проверки, находится ли ребро в пути
-  function isEdgeInPath(edge: TEdge, path: string[]): boolean {
-    for (let i = 0; i < path.length - 1; i++) {
-      const u = path[i];
-      const v = path[i + 1];
-      if (
-        (edge.source === u && edge.target === v) ||
-        (edge.source === v && edge.target === u)
-      ) {
-        return true;
-      }
+    // ДЛЯ ПРЯМОГО РЁБРА: всегда отображаем
+    if (!isBackwardPart) {
+      // Можно добавить дополнительные условия если нужно
     }
-    return false;
-  }
 
-  // === Обработка удаления ===
+    const effectiveSource = isBackwardPart ? target : source;
+    const effectiveTarget = isBackwardPart ? source : target;
+    const effectiveCurvature = isBackwardPart
+      ? -getBackwardCurvature()
+      : edge.curvature ?? 0;
+
+    const x1 = effectiveSource.x,
+      y1 = effectiveSource.y;
+    const x2 = effectiveTarget.x,
+      y2 = effectiveTarget.y;
+
+    const vertexRadius = 20;
+    const startOffset = vertexRadius;
+    const endOffset = edge.directed ? vertexRadius + 10 : vertexRadius;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.hypot(dx, dy) || 1;
+    const ux = dx / length,
+      uy = dy / length;
+
+    const startX = x1 + ux * startOffset;
+    const startY = y1 + uy * startOffset;
+    const endX = x2 - ux * endOffset;
+    const endY = y2 - uy * endOffset;
+
+    const midX = (startX + endX) / 2;
+    const midY = (startY + endY) / 2;
+
+    const perpX = -uy,
+      perpY = ux;
+    const curveDistance = 80;
+    const controlX = midX + perpX * curveDistance * effectiveCurvature;
+    const controlY = midY + perpY * curveDistance * effectiveCurvature;
+
+    const weightPosT = 0.5;
+    const t = weightPosT;
+    const weightX =
+      (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * controlX + t * t * endX;
+    const weightY =
+      (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * controlY + t * t * endY;
+
+    const pathD = `M ${startX} ${startY} Q ${controlX} ${controlY} ${endX} ${endY}`;
+    const arrowId = `arrow-${edge.id}-${
+      isBackwardPart ? "backward" : "forward"
+    }-${stepIndex}`;
+
+    const edgeColor = getEdgeColor(isBackwardPart);
+    const strokeWidth = isBackwardPart ? 2.2 : 2.5;
+    const strokeDasharray = isBackwardPart ? "5,3" : "none";
+
+    // Для обратного ребра не показываем стрелку (поток в обратном направлении)
+    const showArrow = edge.directed && !isBackwardPart;
+
+    return (
+      <g key={`${edge.id}-${isBackwardPart ? "backward" : "forward"}`}>
+        {showArrow && (
+          <defs>
+            <marker
+              id={arrowId}
+              markerWidth="8"
+              markerHeight="8"
+              refX="7"
+              refY="4"
+              orient="auto"
+              markerUnits="strokeWidth"
+            >
+              <path d="M0,0 L0,8 L8,4 Z" fill={edgeColor} />
+            </marker>
+          </defs>
+        )}
+
+        <path
+          d={pathD}
+          fill="none"
+          stroke={edgeColor}
+          strokeWidth={strokeWidth}
+          strokeDasharray={strokeDasharray}
+          markerEnd={showArrow ? `url(#${arrowId})` : undefined}
+          pointerEvents="stroke"
+          cursor={isDragging ? "ns-resize" : "pointer"}
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("foreignObject")) return;
+            e.stopPropagation();
+            onSelect?.(edge.id);
+          }}
+          onDoubleClick={(e) => {
+            if (!isBackwardPart) {
+              e.stopPropagation();
+              e.preventDefault();
+              onSelect?.(edge.id);
+              setIsEditingWeight(true);
+              setTempWeight(edge.weight.toString());
+            }
+          }}
+          onMouseDown={(e) => {
+            if ((e.target as HTMLElement).closest("foreignObject")) return;
+            e.stopPropagation();
+            e.preventDefault();
+            setIsDragging(true);
+            startPos.current = {
+              x: e.clientX,
+              y: e.clientY,
+              curvature: edge.curvature ?? 0,
+            };
+            onSelect?.(edge.id);
+          }}
+          style={{
+            transition: isDragging ? "none" : "all 0.3s ease",
+            opacity: isBackwardPart ? 0.8 : 1,
+          }}
+        />
+
+        {/* МЕТКА ВЕСА/ПОТОКА */}
+        <foreignObject
+          x={weightX - 35}
+          y={weightY - 25}
+          width="70"
+          height="50"
+          pointerEvents="all"
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              height: "100%",
+            }}
+          >
+            {isEditingWeight && !isBackwardPart && isSelected ? (
+              <input
+                ref={weightInputRef}
+                type="number"
+                value={tempWeight}
+                onChange={(e) => setTempWeight(e.target.value)}
+                onBlur={handleWeightSave}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleWeightSave();
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsEditingWeight(false);
+                  }
+                  // Останавливаем всплытие событий Backspace/Delete
+                  if (e.key === "Backspace" || e.key === "Delete") {
+                    e.stopPropagation();
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                autoFocus
+                min="0.1"
+                step="0.1"
+                style={{
+                  width: "60px",
+                  padding: "4px",
+                  textAlign: "center",
+                  border: "2px solid #3b82f6",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  outline: "none",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  padding: "4px 8px",
+                  background: isBackwardPart ? "#fef3c7" : "white",
+                  border: `2px solid ${
+                    isSelected
+                      ? "#3b82f6"
+                      : isBackwardPart
+                      ? "#f59e0b"
+                      : "#e5e7eb"
+                  }`,
+                  borderRadius: "6px",
+                  cursor: isBackwardPart ? "default" : "pointer",
+                  fontWeight: "600",
+                  userSelect: "none",
+                  fontSize: "14px",
+                  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+                  minWidth: "40px",
+                  textAlign: "center",
+                  color: isBackwardPart ? "#d97706" : "#374151",
+                  transition: "all 0.2s ease",
+                  position: "relative",
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!isBackwardPart) {
+                    onSelect?.(edge.id);
+                  }
+                }}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  if (!isBackwardPart) {
+                    handleWeightDoubleClick(e, isBackwardPart);
+                  }
+                }}
+              >
+                {isBackwardPart ? (
+                  // Отображение для обратного ребра
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: "#d97706",
+                        marginBottom: "2px",
+                      }}
+                    ></div>
+                    <div>
+                      ←{currentFlow}/{capacity}
+                    </div>
+                  </div>
+                ) : (
+                  // Отображение для прямого ребра
+                  <div>
+                    {currentFlow > 0 ? (
+                      <div>
+                        {currentFlow}/{capacity}
+                      </div>
+                    ) : (
+                      <div>{edge.weight}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </foreignObject>
+      </g>
+    );
+  };
+
+  // Обработчик клавиш - с защитой от удаления во время редактирования
   useEffect(() => {
-    if (!isSelected) return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Backspace" || e.key === "Delete") {
-        e.preventDefault();
-        onDelete(edge.id);
-        onSelect?.(null);
+      // Если редактируем вес, блокируем Backspace/Delete
+      if (isEditingWeight && (e.key === "Backspace" || e.key === "Delete")) {
+        e.stopPropagation();
+        return;
+      }
+
+      // Обработка только если ребро выбрано и НЕ редактируется
+      if (isSelected && !isEditingWeight) {
+        if (e.key === "Backspace" || e.key === "Delete") {
+          e.preventDefault();
+          onDelete(edge.id);
+          onSelect?.(null);
+        }
+      }
+
+      // Глобальные горячие клавиши
+      if (e.key === "Escape") {
+        if (isEditingWeight) {
+          handleWeightCancel();
+        } else if (isSelected) {
+          onSelect?.(null);
+        }
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isSelected, edge.id, onDelete, onSelect]);
+    document.addEventListener("keydown", handleKeyDown, true);
 
-  // === Глобальное отслеживание мыши для перетаскивания ===
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+    };
+  }, [isSelected, isEditingWeight, edge.id, onDelete, onSelect]);
+
+  // Обработчики для перетаскивания кривизны
   useEffect(() => {
     if (!isDragging) return;
-
     const handleGlobalMouseMove = (e: MouseEvent) => {
       if (!startPos.current) return;
-
       const deltaY = (startPos.current.y - e.clientY) / zoom;
       const newCurvature = startPos.current.curvature + deltaY * 0.0035;
       const clampedCurvature = Math.max(-1, Math.min(1, newCurvature));
-
       onUpdate(edge.id, { curvature: clampedCurvature });
     };
-
     const handleGlobalMouseUp = () => {
       setIsDragging(false);
       startPos.current = null;
     };
-
     document.addEventListener("mousemove", handleGlobalMouseMove);
     document.addEventListener("mouseup", handleGlobalMouseUp);
-
     return () => {
       document.removeEventListener("mousemove", handleGlobalMouseMove);
       document.removeEventListener("mouseup", handleGlobalMouseUp);
     };
   }, [isDragging, zoom, edge.id, onUpdate]);
 
-  // === Перетаскивание изгиба ===
-  const handleEdgeMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("foreignObject")) return;
-    e.stopPropagation();
-    e.preventDefault();
-    setIsDragging(true);
-    startPos.current = {
-      x: e.clientX,
-      y: e.clientY,
-      curvature: edge.curvature ?? 0,
+  // Закрытие редактора веса при клике вне его
+  useEffect(() => {
+    if (!isEditingWeight) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        weightInputRef.current &&
+        !weightInputRef.current.contains(e.target as Node)
+      ) {
+        handleWeightSave();
+      }
     };
-    onSelect?.(edge.id);
-  };
 
-  // === Клик на ребро ===
-  const handleEdgeClick = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("foreignObject")) return;
-    e.stopPropagation();
-    onSelect?.(edge.id);
-  };
+    const timeoutId = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+    }, 0);
 
-  // === Редактирование веса ===
-  const handleWeightDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsEditingWeight(true);
-    setTimeout(() => inputRef.current?.focus(), 0);
-  };
-
-  const handleWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 1;
-    onUpdate(edge.id, { weight: Math.max(1, value) });
-  };
-
-  const handleWeightKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      inputRef.current?.blur();
-    } else if (e.key === "Escape") {
-      setIsEditingWeight(false);
-    }
-  };
-
-  // Текст для отображения на ребре
-  const getEdgeText = (): string => {
-    if (showFlowInfo && !isResidualEdge) {
-      const capacity = edge.weight ?? 1;
-      return `${currentFlow}/${capacity}`;
-    }
-
-    if (isResidualEdge && residualCapacity > 0) {
-      return `r:${residualCapacity}`;
-    }
-
-    return `${edge.weight ?? 1}`;
-  };
-
-  // Фон для метки
-  const getLabelBackground = (): string => {
-    if (isSelected) return "#fee2e2";
-    if (isResidualEdge) return "#faf5ff";
-    if (isInPath) return "#f0f9ff";
-    if (isHighlighted) return "#fffbeb";
-    return "white";
-  };
-
-  // Цвет текста
-  const getLabelTextColor = (): string => {
-    if (isSelected) return "#dc2626";
-    if (isResidualEdge) return "#7c3aed";
-    if (isInPath) return "#0284c7";
-    if (isHighlighted) return "#f59e0b";
-    if (currentFlow > 0 && !isResidualEdge) {
-      const capacity = edge.weight ?? 1;
-      const utilization = currentFlow / capacity;
-      if (utilization >= 0.9) return "#dc2626";
-      if (utilization >= 0.7) return "#f59e0b";
-      if (utilization >= 0.3) return "#10b981";
-      return "#06b6d4";
-    }
-    return "#374151";
-  };
-
-  // Граница метки
-  const getLabelBorderColor = (): string => {
-    if (isSelected) return "#dc2626";
-    if (isResidualEdge) return "#7c3aed";
-    if (isInPath) return "#0284c7";
-    if (isHighlighted) return "#f59e0b";
-    return "#e2e8f0";
-  };
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isEditingWeight]);
 
   return (
     <>
-      {/* Стрелка */}
-      {(edge.directed || isResidualEdge) && (
-        <defs>
-          <marker
-            id={arrowId}
-            markerWidth="6"
-            markerHeight="6"
-            refX="5"
-            refY="3"
-            orient="auto"
-          >
-            <path d="M0,0 L0,6 L6,3 z" fill={edgeColor} />
-          </marker>
-        </defs>
-      )}
-
-      {/* Основное ребро */}
-      <path
-        d={pathD}
-        fill="none"
-        stroke={edgeColor}
-        strokeWidth={getStrokeWidth()}
-        strokeDasharray={getStrokeDasharray()}
-        markerEnd={
-          edge.directed || isResidualEdge ? `url(#${arrowId})` : undefined
-        }
-        pointerEvents="stroke"
-        cursor={isDragging ? "ns-resize" : "pointer"}
-        onClick={handleEdgeClick}
-        onMouseDown={handleEdgeMouseDown}
-        style={{
-          transition: isDragging ? "none" : "all 0.3s ease",
-          opacity: isResidualEdge ? 0.7 : 1,
-        }}
-      />
-
-      {/* Метка с весом/потоком */}
-      <foreignObject
-        x={weightX - 35}
-        y={weightY - 25}
-        width="70"
-        height="40"
-        pointerEvents="all"
-        onClick={onWeightClick}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100%",
-          }}
-        >
-          {isEditingWeight ? (
-            <input
-              ref={inputRef}
-              type="number"
-              min="1"
-              defaultValue={edge.weight ?? 1}
-              onChange={handleWeightChange}
-              onBlur={() => setIsEditingWeight(false)}
-              onKeyDown={handleWeightKeyDown}
-              style={{
-                width: "60px",
-                textAlign: "center",
-                fontWeight: "600",
-                border: "2px solid #3b82f6",
-                borderRadius: "4px",
-                fontSize: "14px",
-                background: "white",
-                zIndex: 20,
-              }}
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <div
-              onDoubleClick={handleWeightDoubleClick}
-              style={{
-                padding: "4px 8px",
-                background: getLabelBackground(),
-                border: `2px solid ${getLabelBorderColor()}`,
-                borderRadius: "6px",
-                cursor: "text",
-                fontWeight: "600",
-                userSelect: "none",
-                fontSize: "14px",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                minWidth: "40px",
-                textAlign: "center",
-                color: getLabelTextColor(),
-                zIndex: 20,
-              }}
-            >
-              {getEdgeText()}
-            </div>
-          )}
-        </div>
-      </foreignObject>
+      {renderEdgePart(false)}
+      {renderEdgePart(true)}
     </>
   );
 };

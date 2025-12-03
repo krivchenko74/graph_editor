@@ -95,18 +95,6 @@ const Logs: React.FC<AlgorithmLogProps> = ({
     }
   };
 
-  // Функция для получения названия алгоритма
-  const getAlgorithmName = () => {
-    switch (algorithmType) {
-      case "bfs":
-        return "BFS (поиск в ширину)";
-      case "mst":
-        return "Алгоритм Прима (MST)";
-      default:
-        return "DFS (поиск в глубину)";
-    }
-  };
-
   // Получение веса MST из metadata
   const getMSTTotalWeight = (step: AlgorithmStep): number => {
     return step.metadata?.mstTotalWeight || 0;
@@ -198,7 +186,6 @@ const Logs: React.FC<AlgorithmLogProps> = ({
             >
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <h3 className={styles.title}>Ход выполнения алгоритма</h3>
-                <div className={styles.algorithmType}>{getAlgorithmName()}</div>
               </div>
               <ChevronDown className={styles.collapseIcon} />
             </div>

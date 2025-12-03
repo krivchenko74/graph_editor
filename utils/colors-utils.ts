@@ -7,35 +7,48 @@ export const getEdgeColor = (
   currentStep: AlgorithmStep | null,
   isSelected: boolean
 ): EdgeColor => {
-  // Если нет текущего шага визуализации
   if (!currentStep) {
     return isSelected ? EdgeColor.SELECTED : EdgeColor.DEFAULT;
   }
 
-  // Порядок приоритетов (от высшего к низшему)
+  // Проверяем, является ли ребро остаточным/обратным
+  const isResidual =
+    currentStep.metadata?.residualEdges?.[edgeId] !== undefined;
 
-  // 1. Подсвеченное ребро (активное в текущем шаге)
+  if (isResidual) {
+    return EdgeColor.HIGHLIGHTED; // Оранжевый для обратных рёбер
+  }
+
+  // Порядок приоритетов
   if (currentStep.highlightedEdges?.includes(edgeId)) {
-    return EdgeColor.HIGHLIGHTED; // Оранжевый
+    return EdgeColor.HIGHLIGHTED;
   }
 
-  // 2. Ребро в пути (специальное назначение)
+  if (currentStep.metadata?.augmentingPath) {
+    const parentMap = currentStep.metadata.parentMap || {};
+    // Проверяем, есть ли ребро в пути
+    for (const vertexId in parentMap) {
+      if (parentMap[vertexId].edgeId === edgeId) {
+        return parentMap[vertexId].isForward
+          ? EdgeColor.PATH
+          : EdgeColor.HIGHLIGHTED;
+      }
+    }
+  }
+
   if (currentStep.metadata?.pathEdges?.includes(edgeId)) {
-    return EdgeColor.PATH; // Голубой
+    return EdgeColor.PATH;
   }
 
-  // 3. Пройденное ребро
   if (currentStep.visitedEdges?.includes(edgeId)) {
-    return EdgeColor.VISITED; // Зеленый
+    return EdgeColor.VISITED;
   }
 
-  // 4. Выделенное ребро (пользователем)
   if (isSelected) {
-    return EdgeColor.SELECTED; // Красный
+    return EdgeColor.SELECTED;
   }
 
-  // Ребро по умолчанию
-  return EdgeColor.DEFAULT; // Серый
+  return EdgeColor.DEFAULT;
 };
 
 export const getVertexColor = (
